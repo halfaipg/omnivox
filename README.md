@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Ultravox Voice Integration
+=======
+# Ultravox Telephony Integration
+>>>>>>> 45250697e5d76e96635ad5ab3ea27dc1824af887
 
 A powerful integration that connects Ultravox's AI voice capabilities with telephony services (Twilio and Telnyx) for creating intelligent voice agents capable of natural conversations over phone calls.
 
