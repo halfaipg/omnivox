@@ -2,8 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Agent</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Loading...</title>
+    <script>
+        // Immediately fetch config and update title
+        (async function() {
+            try {
+                const response = await fetch('/config');
+                const config = await response.json();
+                if (config.appName) {
+                    document.title = config.appName;
+                }
+            } catch (error) {
+                console.error('Error fetching initial config:', error);
+            }
+        })();
+    </script>
     <style>
         :root {
             /* Dark theme (default) */
@@ -80,16 +94,19 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            max-width: 700px;
-            margin: 0 auto;
+            max-width: 100%; /* Changed from 700px to 100% to use full viewport width */
+            margin: 0;
             padding: 0; /* Reset all body padding */
             line-height: 1.5;
             background-color: var(--bg-primary);
             color: var(--text-primary);
-            display: grid;
-            place-items: center;
+            display: flex; /* Changed from grid to flex */
+            flex-direction: column; /* Stack children vertically */
+            align-items: center; /* Center children horizontally */
+            justify-content: flex-start; /* Align to top */
             min-height: 100vh;
             overflow-x: hidden; /* Prevent horizontal scrollbar */
+            box-sizing: border-box; /* Ensure padding is included in width calculations */
         }
 
         .container {
@@ -98,17 +115,14 @@
             padding: 25px 30px;
             margin-bottom: 22px;
             box-shadow: var(--shadow-subtle);
-            transition: all 0.3s ease;
-            width: calc(100% - 20px); /* Adjust width to account for body padding */
-            max-width: 680px; /* Add max-width to container */
-            box-sizing: border-box; /* Include padding and border in the element's total width and height */
-            margin-left: auto;   /* Center the container horizontally */
-            margin-right: auto;  /* Center the container horizontally */
+            transition: box-shadow 0.3s ease;
+            width: 100%;
+            max-width: 640px;
+            box-sizing: border-box;
             border: 1px solid var(--input-border);
         }
 
         .container:hover {
-            transform: translateY(-3px);
             box-shadow: var(--shadow-strong);
         }
 
@@ -132,6 +146,8 @@
             letter-spacing: -0.3px;
             font-weight: 600;
             margin-bottom: 20px;
+            color: var(--text-primary);
+            text-align: center;
         }
 
         label {
@@ -213,6 +229,8 @@
             transition: all 0.5s ease;
             opacity: 1;
             transform: translateY(0);
+            -webkit-text-size-adjust: 100%; /* Prevent iOS from adjusting text size */
+            transform-origin: top center; /* Set transform origin to top center */
         }
         
         .result.success {
@@ -776,6 +794,336 @@
         input[type="tel"] {
             padding-left: 25px !important;
         }
+
+        /* Recording Interface Styles */
+        .recording-interface {
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+
+        .mic-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .mic-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            border: 2px solid var(--accent);
+        }
+
+        .mic-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .mic-icon {
+            width: 40px;
+            height: 40px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234CAF50' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z'%3E%3C/path%3E%3Cpath d='M19 10v2a7 7 0 0 1-14 0v-2'%3E%3C/path%3E%3Cline x1='12' y1='19' x2='12' y2='23'%3E%3C/line%3E%3Cline x1='8' y1='23' x2='16' y2='23'%3E%3C/line%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+            transition: all 0.3s ease;
+        }
+
+        .recording-rings {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            width: 100%;
+            height: 100%;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            opacity: 0;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .ring2 { animation-delay: 0.6s; }
+        .ring3 { animation-delay: 1.2s; }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .recording .recording-rings {
+            opacity: 1;
+        }
+
+        .recording .mic-icon {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f44336' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3C/svg%3E");
+        }
+
+        .recording .mic-button {
+            border-color: #f44336;
+            animation: recording-pulse 2s ease infinite;
+        }
+
+        @keyframes recording-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 15px rgba(244, 67, 54, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+            }
+        }
+
+        #recordingStatus {
+            font-size: 1.1em;
+            color: var(--text-secondary);
+        }
+
+        #recordingTimer {
+            font-family: monospace;
+            font-size: 1.2em;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        #recordingTimer.warning {
+            color: #ffa726;
+        }
+
+        #recordingTimer.danger {
+            color: #f44336;
+        }
+
+        #recordingControls, #previewControls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .danger-button {
+            background-color: #f44336;
+        }
+
+        .danger-button:hover {
+            background-color: #d32f2f;
+        }
+
+        .success-button {
+            background-color: var(--success);
+        }
+
+        .success-button:hover {
+            background-color: #00a844;
+        }
+
+        audio {
+            margin: 15px auto;
+            width: 100%;
+            max-width: 300px;
+            display: block;
+        }
+
+        /* Style audio player */
+        audio::-webkit-media-controls-panel {
+            background-color: var(--bg-tertiary);
+        }
+
+        audio::-webkit-media-controls-current-time-display,
+        audio::-webkit-media-controls-time-remaining-display {
+            color: var(--text-primary);
+        }
+
+        /* File input styling */
+        input[type="file"] {
+            width: auto;
+            max-width: 80%;
+            margin: 8px auto;
+            padding: 10px;
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-block;
+            text-align: center;
+            border: 1px solid var(--input-border);
+            transition: all 0.3s ease;
+        }
+
+        input[type="file"]:hover {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        /* Light mode adjustments for file input */
+        :root.light-mode input[type="file"] {
+            background-color: #e8e8e8;
+            color: var(--text-primary);
+        }
+
+        :root.light-mode input[type="file"]:hover {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        
+        /* Mobile-specific adjustments */
+        @media (max-width: 768px) {
+            .result {
+                font-size: 14px; /* Slightly smaller font on mobile */
+                padding: 15px;
+                -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            }
+            
+            pre {
+                font-size: 12px; /* Smaller code font on mobile */
+                word-break: break-word; /* Prevent horizontal scrolling */
+                white-space: pre-wrap; /* Allow wrapping */
+            }
+            
+            /* Prevent input zoom on iOS */
+            input, select, textarea {
+                font-size: 16px !important; /* Minimum font size to prevent zoom on iOS */
+            }
+            
+            /* Improve button tap targets on mobile */
+            button {
+                min-height: 44px; /* Apple's recommended minimum touch target size */
+            }
+        }
+
+        /* Password Protection Styles */
+        .password-protection {
+            text-align: center;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .password-protection p {
+            font-size: 1.1em !important;
+            color: var(--text-primary) !important;
+            margin-bottom: 15px !important;
+            font-weight: normal !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+            letter-spacing: normal !important;
+        }
+
+        .password-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .password-input-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 300px;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .password-input-container input {
+            margin: 0;
+            text-align: center;
+            width: 100%;
+        }
+
+        .password-input-container button {
+            margin: 0;
+            min-width: 120px;
+            align-self: center;
+        }
+
+        .section-content {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.5s ease, opacity 0.5s ease, padding 0.5s ease;
+            padding: 0;
+        }
+
+        .section-content.unlocked {
+            max-height: 5000px; /* Large enough to contain all content */
+            opacity: 1;
+            padding: 20px 0 0 0;
+        }
+
+        .lock-icon {
+            display: inline-block;
+            margin-left: 10px !important; 
+            vertical-align: middle;
+            transition: all 0.3s ease;
+            opacity: 1;
+        }
+
+        .lock-icon svg {
+            stroke: var(--text-secondary);
+        }
+
+        .lock-icon.hidden {
+            opacity: 0;
+            width: 0;
+            margin-left: 0;
+        }
+
+        .password-error {
+            color: var(--error-color);
+            font-size: 0.9em;
+            margin-top: 5px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            height: 0;
+            overflow: hidden;
+        }
+
+        .password-error.visible {
+            opacity: 1;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .section-header h2 {
+            margin-bottom: 0 !important;
+            font-size: 1.6em !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.3px !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+            color: var(--text-primary) !important;
+        }
     </style>
 </head>
 <body>
@@ -818,7 +1166,7 @@
             <div>
                 <label for="phoneNumber">Phone Number</label>
                 <div class="phone-input-container">
-                    <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="1234567890" inputmode="tel" pattern="[0-9\s\-\(\)]{5,}" required>
+                    <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="1234567890" inputmode="tel" pattern="[0-9\s\-\(\)\+]{5,}" required>
                 </div>
                 <small class="help-text">Enter 10 digit US phone number or 11 digit international number with country code</small>
             </div>
@@ -883,30 +1231,142 @@ Leave empty to use the above prompt."></textarea>
         </div>
     </div>
 
-    <!-- Corpus Creation Section -->
+    <!-- Voice Cloning Section - MOVED BEFORE CORPUS SECTION -->
     <div class="container">
-        <h2>Create Knowledge Base Corpus</h2>
-        <form id="corpusForm">
+        <div class="section-header" id="voiceCloneHeader">
+            <h2 style="font-style: normal !important; font-size: 1.6em !important;">Clone Voice</h2>
+            <span class="lock-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+            </span>
+        </div>
+        
+        <div class="password-protection" id="voiceCloneProtection">
+            <p style="font-style: normal !important;">Enter Password to Access</p>
+            <div class="password-form">
+                <div class="password-input-container">
+                    <input type="password" id="voiceClonePassword" placeholder="Enter password">
+                    <button type="button" id="voiceCloneUnlock">Unlock</button>
+                </div>
+                <div class="password-error" id="voiceCloneError">Incorrect password</div>
+            </div>
+        </div>
+        
+        <div class="section-content" id="voiceCloneContent">
+            <!-- Audio Recording Interface -->
+            <div class="recording-interface" style="text-align: center; margin-bottom: 30px;">
+                <div class="mic-container">
+                    <div class="mic-button">
+                        <div class="mic-icon"></div>
+                        <div class="recording-rings">
+                            <div class="ring ring1"></div>
+                            <div class="ring ring2"></div>
+                            <div class="ring ring3"></div>
+                        </div>
+                    </div>
+                    <div id="recordingStatus">Click to start recording</div>
+                    <div id="recordingTimer" class="hidden">00:00</div>
+                    <div id="recordingControls" class="hidden">
+                        <button id="stopRecording" class="danger-button">Stop Recording</button>
+                        <button id="cancelRecording" class="cancel-button">Cancel</button>
+                    </div>
+                    <audio id="recordingPreview" controls class="hidden"></audio>
+                    <div id="previewControls" class="hidden">
+                        <button id="useRecording" class="success-button">Use Recording</button>
+                        <button id="discardRecording" class="cancel-button">Discard</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Audio File Upload Section -->
             <div>
-                <label for="corpusName">Corpus Name</label>
-                <input type="text" id="corpusName" name="corpusName" placeholder="MyKnowledgeBase" required>
+                <label for="audioFile">Or Upload Audio File</label>
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <input type="file" id="audioFile" name="audioFile" accept=".mp3,.wav" style="margin: 0 auto;">
+                </div>
+                <small class="help-text">Optional: Upload a WAV or MP3 file (max 10MB).</small>
             </div>
-            <div>
-                <label for="corpusDescription">Description (optional)</label>
-                <input type="text" id="corpusDescription" name="corpusDescription" placeholder="Description of this knowledge base">
+            
+            <!-- Renamed from "Requirements" to "Recommendations" -->
+            <div class="requirements-box" style="background: var(--bg-tertiary); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <h4 style="margin-top: 0; margin-bottom: 10px;">Audio Recommendations:</h4>
+                <ul style="margin-top: 0; margin-bottom: 0; list-style: none; padding-left: 0; display: inline-block; text-align: left;">
+                    <li style="margin-bottom: 8px;"><span style="display: inline-block; width: 25px; text-align: center;">📝</span> 30-60 seconds of clear speech</li>
+                    <li style="margin-bottom: 8px;"><span style="display: inline-block; width: 25px; text-align: center;">🎤</span> Single speaker, no background voices</li>
+                    <li style="margin-bottom: 8px;"><span style="display: inline-block; width: 25px; text-align: center;">🔇</span> No background noise, music, or echo</li>
+                    <li style="margin-bottom: 0;"><span style="display: inline-block; width: 25px; text-align: center;">🗣️</span> Natural speaking pace and tone</li>
+                </ul>
             </div>
-            <div>
-                <label for="corpusUrls">Website URLs</label>
-                <textarea id="corpusUrls" name="corpusUrls" rows="3" placeholder="https://example.com/page1,&#10;https://github.com/username/repo/README.md,&#10;https://docs.yourdomain.com/info"></textarea>
-                <small class="help-text">Add comma-separated URLs for websites you want to include in this corpus. Best with informative text content like documentation and GitHub README files.</small>
+
+            <form id="voiceCloneForm">
+                <div>
+                    <label for="voiceName">Voice Name</label>
+                    <input type="text" id="voiceName" name="voiceName" placeholder="My Custom Voice" required>
+                </div>
+                <div>
+                    <label for="voiceDescription">Description (optional)</label>
+                    <input type="text" id="voiceDescription" name="voiceDescription" placeholder="Voice recorded on Jan 1, 2024">
+                </div>
+                <small style="color: #f44336; font-weight: bold; margin-top: 5px; margin-bottom: 15px; text-align: center; display: block;">Creating a new voice will DELETE previously cloned voice! Please allow up to 2-3 minutes for the new voice to be ready and do not refresh the page!
+                <div class="form-group">
+                    <button type="submit" id="cloneVoiceBtn">Clone Voice<span id="voiceLoadingSpinner" class="spinner hidden"></span></button>
+                </div>
+            </form>
+            <div id="voiceCloneResult" class="result hidden">
+                <h3>Voice Cloning Result:</h3>
+                <pre id="voiceCloneResultContent"></pre>
             </div>
-            <div class="form-group">
-                <button type="submit" id="createCorpusBtn">Create Corpus<span id="corpusLoadingSpinner" class="spinner hidden"></span></button>
+        </div>
+    </div>
+
+    <!-- Corpus Creation Section - MOVED AFTER VOICE CLONING -->
+    <div class="container">
+        <div class="section-header" id="corpusHeader">
+            <h2 style="font-style: normal !important; font-size: 1.6em !important;">Knowledge Base</h2>
+            <span class="lock-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+            </span>
+        </div>
+        
+        <div class="password-protection" id="corpusProtection">
+            <p style="font-style: normal !important;">Enter Password to Access</p>
+            <div class="password-form">
+                <div class="password-input-container">
+                    <input type="password" id="corpusPassword" placeholder="Enter password">
+                    <button type="button" id="corpusUnlock">Unlock</button>
+                </div>
+                <div class="password-error" id="corpusError">Incorrect password</div>
             </div>
-        </form>
-        <div id="corpusResult" class="result hidden">
-            <h3>Corpus Creation Result:</h3>
-            <pre id="corpusResultContent"></pre>
+        </div>
+        
+        <div class="section-content" id="corpusContent">
+            <form id="corpusForm">
+                <div>
+                    <label for="corpusName">Corpus Name</label>
+                    <input type="text" id="corpusName" name="corpusName" placeholder="MyKnowledgeBase" required>
+                </div>
+                <div>
+                    <label for="corpusDescription">Description (optional)</label>
+                    <input type="text" id="corpusDescription" name="corpusDescription" placeholder="Description of this knowledge base">
+                </div>
+                <div>
+                    <label for="corpusUrls">Website URLs</label>
+                    <textarea id="corpusUrls" name="corpusUrls" rows="3" placeholder="https://example.com/page1,&#10;https://github.com/username/repo/README.md,&#10;https://docs.yourdomain.com/info"></textarea>
+                    <small class="help-text">Add comma-separated URLs for websites you want to include in this corpus. Best with informative text content like documentation and GitHub README files.</small>
+                </div>
+                <div class="form-group">
+                    <button type="submit" id="createCorpusBtn">Create Corpus<span id="corpusLoadingSpinner" class="spinner hidden"></span></button>
+                </div>
+            </form>
+            <div id="corpusResult" class="result hidden">
+                <h3>Corpus Creation Result:</h3>
+                <pre id="corpusResultContent"></pre>
+            </div>
         </div>
     </div>
 
@@ -1001,12 +1461,21 @@ Leave empty to use the above prompt."></textarea>
                 // Load available corpora
                 await loadCorpora();
                 
-                // Add form submit handler
-                const form = document.getElementById('outboundForm');
-                if (form) {
-                    form.addEventListener('submit', function(e) {
+                // Add form submit handlers
+                const outboundForm = document.getElementById('outboundForm');
+                if (outboundForm) {
+                    outboundForm.addEventListener('submit', function(e) {
                         e.preventDefault();
                         submitOutboundForm(e);
+                    });
+                }
+
+                // Add voice clone form handler
+                const voiceCloneForm = document.getElementById('voiceCloneForm');
+                if (voiceCloneForm) {
+                    voiceCloneForm.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        await submitVoiceCloneForm(e);
                     });
                 }
                 
@@ -1404,17 +1873,24 @@ Leave empty to use the above prompt."></textarea>
         async function submitOutboundForm(e) {
             if (e) e.preventDefault();
             
+            // Prevent scrolling during form submission
+            document.body.style.overflow = 'hidden';
+            
             let phoneNumber = document.getElementById('phoneNumber').value;
             
-            // Clean the phone number (remove any non-digit characters)
-            const cleanNumber = phoneNumber.replace(/\D/g, '');
+            // Clean the phone number (preserve + but remove other non-digit characters)
+            let hasPlus = phoneNumber.startsWith('+');
+            const cleanNumber = phoneNumber.replace(/[^\d]/g, '');
             
             // If it's a 10-digit number without prefix, add +1
             if (cleanNumber.length === 10) {
                 phoneNumber = '+1' + cleanNumber;
+            } else if (hasPlus) {
+                // If it had a + prefix, preserve it
+                phoneNumber = '+' + cleanNumber;
             } else {
                 // For all other cases, ensure it has a + prefix
-                phoneNumber = phoneNumber.startsWith('+') ? phoneNumber : '+' + phoneNumber;
+                phoneNumber = '+' + cleanNumber;
             }
 
             const systemPrompt = document.getElementById('systemPrompt').value;
@@ -1523,6 +1999,17 @@ Leave empty to use the above prompt."></textarea>
                 // Show the result with animation
                 setTimeout(() => {
                     resultElement.classList.remove('refreshing');
+                    // Restore scrolling
+                    document.body.style.overflow = '';
+                    
+                    // Ensure we don't zoom on mobile
+                    if (window.innerWidth <= 768) {
+                        // Prevent any zoom by maintaining the viewport scale
+                        document.querySelector('meta[name="viewport"]').setAttribute(
+                            'content', 
+                            'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
+                        );
+                    }
                 }, 50);
                 
             } catch (error) {
@@ -1539,6 +2026,8 @@ Leave empty to use the above prompt."></textarea>
                 // Show the result with animation
                 setTimeout(() => {
                     resultElement.classList.remove('refreshing');
+                    // Restore scrolling
+                    document.body.style.overflow = '';
                 }, 50);
             }
         }
@@ -1625,6 +2114,399 @@ Leave empty to use the above prompt."></textarea>
                 }, 50);
             }
         }
+
+        // Audio Recording Handler
+        document.addEventListener('DOMContentLoaded', function() {
+            let mediaRecorder;
+            let audioChunks = [];
+            let recordingStartTime;
+            let timerInterval;
+            let recordedBlob;
+            
+            const micButton = document.querySelector('.mic-button');
+            const recordingStatus = document.getElementById('recordingStatus');
+            const recordingTimer = document.getElementById('recordingTimer');
+            const recordingControls = document.getElementById('recordingControls');
+            const previewControls = document.getElementById('previewControls');
+            const recordingPreview = document.getElementById('recordingPreview');
+            const stopRecordingBtn = document.getElementById('stopRecording');
+            const cancelRecordingBtn = document.getElementById('cancelRecording');
+            const useRecordingBtn = document.getElementById('useRecording');
+            const discardRecordingBtn = document.getElementById('discardRecording');
+            const audioFileInput = document.getElementById('audioFile');
+
+            function updateTimer() {
+                // Only update if we're actually recording
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    const now = Date.now();
+                    const duration = Math.floor((now - recordingStartTime) / 1000);
+                    const minutes = Math.floor(duration / 60).toString().padStart(2, '0');
+                    const seconds = (duration % 60).toString().padStart(2, '0');
+                    recordingTimer.textContent = `${minutes}:${seconds}`;
+
+                    // Add warning classes based on duration
+                    if (duration >= 50 && duration < 55) {
+                        recordingTimer.className = 'warning';
+                    } else if (duration >= 55) {
+                        recordingTimer.className = 'danger';
+                    }
+
+                    // Auto-stop at 60 seconds
+                    if (duration >= 60) {
+                        stopRecording();
+                    }
+                } else {
+                    // If we're not recording, clear the interval
+                    clearInterval(timerInterval);
+                    recordingTimer.textContent = '00:00';
+                    recordingTimer.className = '';
+                }
+            }
+
+            function startRecording() {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+                        
+                        mediaRecorder.ondataavailable = e => {
+                            audioChunks.push(e.data);
+                        };
+
+                        mediaRecorder.onstop = () => {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                            recordedBlob = audioBlob;
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            recordingPreview.src = audioUrl;
+                            
+                            // Show the preview and controls immediately
+                            recordingPreview.classList.remove('hidden');
+                            previewControls.classList.remove('hidden');
+                            
+                            // Clear timer when recording stops
+                            clearInterval(timerInterval);
+                            recordingTimer.textContent = '00:00';
+                        };
+
+                        mediaRecorder.start();
+                        recordingStartTime = Date.now();
+                        // Clear any existing interval before starting a new one
+                        if (timerInterval) {
+                            clearInterval(timerInterval);
+                        }
+                        timerInterval = setInterval(updateTimer, 1000);
+                        
+                        // Update UI
+                        micButton.classList.add('recording');
+                        recordingStatus.textContent = 'Recording in progress...';
+                        recordingTimer.classList.remove('hidden');
+                        recordingControls.classList.remove('hidden');
+                        recordingPreview.classList.add('hidden');
+                        previewControls.classList.add('hidden');
+                    })
+                    .catch(error => {
+                        console.error('Error accessing microphone:', error);
+                        alert('Unable to access microphone. Please ensure you have granted permission.');
+                    });
+            }
+
+            function stopRecording() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    clearInterval(timerInterval);
+                    
+                    // Update UI
+                    micButton.classList.remove('recording');
+                    recordingStatus.textContent = 'Recording complete';
+                    recordingTimer.classList.add('hidden');
+                    recordingControls.classList.add('hidden');
+                }
+            }
+
+            function cancelRecording() {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    clearInterval(timerInterval);
+                }
+                
+                // Reset UI
+                micButton.classList.remove('recording');
+                recordingStatus.textContent = 'Click to start recording';
+                recordingTimer.classList.add('hidden');
+                recordingControls.classList.add('hidden');
+                recordingPreview.classList.add('hidden');
+                recordingTimer.className = '';
+            }
+
+            // Event Listeners
+            micButton.addEventListener('click', function() {
+                if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                    startRecording();
+                } else if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    // If already recording, stop when mic button is clicked again
+                    stopRecording();
+                }
+            });
+
+            stopRecordingBtn.addEventListener('click', stopRecording);
+            cancelRecordingBtn.addEventListener('click', cancelRecording);
+            
+            useRecordingBtn.addEventListener('click', function() {
+                if (recordedBlob) {
+                    // Create a File object from the Blob
+                    const file = new File([recordedBlob], 'recording.wav', { type: 'audio/wav' });
+                    
+                    // Create a new FileList containing the File
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    
+                    // Set the file input's files
+                    audioFileInput.files = dataTransfer.files;
+                    
+                    // Trigger the change event
+                    const event = new Event('change');
+                    audioFileInput.dispatchEvent(event);
+                    
+                    // Reset recording UI
+                    recordingStatus.textContent = 'Recording selected';
+                    previewControls.classList.add('hidden');
+                    
+                    // Hide the file upload section
+                    const fileUploadSection = document.querySelector('#voiceCloneContent > div:nth-child(2)');
+                    if (fileUploadSection) {
+                        fileUploadSection.style.display = 'none';
+                    }
+                }
+            });
+            
+            discardRecordingBtn.addEventListener('click', function() {
+                cancelRecording();
+                recordedBlob = null;
+                
+                // Show the file upload section again
+                const fileUploadSection = document.querySelector('#voiceCloneContent > div:nth-child(2)');
+                if (fileUploadSection) {
+                    fileUploadSection.style.display = '';
+                }
+            });
+        });
+
+        // Voice cloning form submission handler
+        async function submitVoiceCloneForm(e) {
+            e.preventDefault();
+            
+            // Prevent scrolling during form submission
+            document.body.style.overflow = 'hidden';
+            
+            const voiceName = document.getElementById('voiceName').value;
+            const voiceDescription = document.getElementById('voiceDescription').value;
+            const audioFile = document.getElementById('audioFile').files[0];
+            
+            if (!audioFile) {
+                alert('Please select an audio file or record one');
+                document.body.style.overflow = ''; // Restore scrolling
+                return;
+            }
+            
+            // Get result elements
+            const resultElement = document.getElementById('voiceCloneResult');
+            const resultContentElement = document.getElementById('voiceCloneResultContent');
+            const loadingSpinner = document.getElementById('voiceLoadingSpinner');
+            
+            // Show loading spinner
+            loadingSpinner.classList.remove('hidden');
+            
+            // If result is already visible, add refreshing class for transition
+            if (!resultElement.classList.contains('hidden')) {
+                resultElement.classList.add('refreshing');
+                await new Promise(resolve => setTimeout(resolve, 300));
+            } else {
+                resultElement.classList.remove('hidden');
+                resultElement.classList.add('refreshing');
+            }
+            
+            try {
+                // Show initial status
+                resultContentElement.textContent = 'Checking for existing voices...';
+                
+                // Get existing voices
+                const voicesResponse = await fetch('/voices');
+                const voicesData = await voicesResponse.json();
+                
+                // Check for existing cloned voices
+                if (voicesData.results && voicesData.results.length > 0) {
+                    const clonedVoices = voicesData.results.filter(voice => voice.type === 'VOICE_TYPE_CLONED');
+                    if (clonedVoices.length > 0) {
+                        resultContentElement.textContent = 'Deleting existing cloned voices...';
+                    }
+                }
+                
+                const formData = new FormData();
+                formData.append('name', voiceName);
+                if (voiceDescription) {
+                    formData.append('description', voiceDescription);
+                }
+                formData.append('audioFile', audioFile);
+                
+                console.log('Submitting voice clone form with data:', {
+                    name: voiceName,
+                    description: voiceDescription,
+                    audioFile: audioFile.name
+                });
+                
+                resultContentElement.textContent = 'Creating new voice...';
+                
+                const response = await fetch('/clone-voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        throw new Error(errorJson.error || errorJson.message || 'Voice cloning failed');
+                    } catch (e) {
+                        throw new Error(`Voice cloning failed: ${errorText}`);
+                    }
+                }
+                
+                const data = await response.json();
+                
+                // Hide loading spinner
+                loadingSpinner.classList.add('hidden');
+                
+                // Update content
+                resultContentElement.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.error) {
+                    resultElement.classList.add('error');
+                    resultElement.classList.remove('success');
+                } else {
+                    resultElement.classList.add('success');
+                    resultElement.classList.remove('error');
+                    
+                    // Refresh voice list
+                    await loadVoices();
+                }
+                
+                // Show the result with animation
+                setTimeout(() => {
+                    resultElement.classList.remove('refreshing');
+                    // Restore scrolling
+                    document.body.style.overflow = '';
+                    
+                    // Ensure we don't zoom on mobile
+                    if (window.innerWidth <= 768) {
+                        // Prevent any zoom by maintaining the viewport scale
+                        document.querySelector('meta[name="viewport"]').setAttribute(
+                            'content', 
+                            'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
+                        );
+                    }
+                }, 50);
+                
+            } catch (error) {
+                console.error('Error cloning voice:', error);
+                
+                // Hide loading spinner
+                loadingSpinner.classList.add('hidden');
+                
+                // Update content to show error
+                resultContentElement.textContent = 'Error: ' + error.message;
+                resultElement.classList.add('error');
+                resultElement.classList.remove('success');
+                
+                // Show the result with animation
+                setTimeout(() => {
+                    resultElement.classList.remove('refreshing');
+                    // Restore scrolling
+                    document.body.style.overflow = '';
+                }, 50);
+            }
+        }
+    </script>
+
+    <!-- Password Protection Script -->
+    <script>
+        // Fetch password from server config
+        let SECTION_PASSWORD = '';
+        
+        async function fetchPassword() {
+            try {
+                console.log('Fetching password from config...');
+                const response = await fetch('/config');
+                const config = await response.json();
+                console.log('Config received:', config);
+                SECTION_PASSWORD = config.sectionPassword || 'demo123';
+                console.log('Password set:', SECTION_PASSWORD);
+                return SECTION_PASSWORD;
+            } catch (error) {
+                console.error('Error fetching password:', error);
+                return 'demo123';
+            }
+        }
+
+        function setupPasswordProtection(sectionId) {
+            console.log('Setting up password protection for:', sectionId);
+            const header = document.getElementById(`${sectionId}Header`);
+            const protection = document.getElementById(`${sectionId}Protection`);
+            const content = document.getElementById(`${sectionId}Content`);
+            const unlockBtn = document.getElementById(`${sectionId}Unlock`);
+            const passwordInput = document.getElementById(`${sectionId}Password`);
+            const errorDiv = document.getElementById(`${sectionId}Error`);
+            const lockIcon = header.querySelector('.lock-icon');
+
+            // Check if section was previously unlocked
+            const isUnlocked = localStorage.getItem(`${sectionId}Unlocked`) === 'true';
+            if (isUnlocked) {
+                protection.style.display = 'none';
+                content.classList.add('unlocked');
+                lockIcon.classList.add('hidden');
+            }
+
+            unlockBtn.addEventListener('click', () => {
+                console.log('Unlock attempt:', sectionId);
+                console.log('Input value:', passwordInput.value);
+                console.log('Expected password:', SECTION_PASSWORD);
+                if (passwordInput.value === SECTION_PASSWORD) {
+                    console.log('Password correct for:', sectionId);
+                    protection.style.display = 'none';
+                    content.classList.add('unlocked');
+                    lockIcon.classList.add('hidden');
+                    errorDiv.classList.remove('visible');
+                    // Store unlock state
+                    localStorage.setItem(`${sectionId}Unlocked`, 'true');
+                } else {
+                    console.log('Password incorrect for:', sectionId);
+                    errorDiv.classList.add('visible');
+                    passwordInput.value = '';
+                }
+            });
+
+            // Also allow Enter key to submit
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    unlockBtn.click();
+                }
+            });
+        }
+
+        // Set up password protection for both sections
+        document.addEventListener('DOMContentLoaded', async () => {
+            // First fetch the password
+            console.log('Initializing password protection...');
+            SECTION_PASSWORD = await fetchPassword();
+            console.log('Password initialized:', SECTION_PASSWORD);
+            
+            // Then set up protection for both sections
+            setupPasswordProtection('voiceClone');
+            setupPasswordProtection('corpus');
+        });
     </script>
 </body>
 </html> 

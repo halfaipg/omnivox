@@ -1,287 +1,258 @@
-<<<<<<< HEAD
 # Ultravox Voice Integration
-=======
-# Ultravox Telephony Integration
->>>>>>> 45250697e5d76e96635ad5ab3ea27dc1824af887
 
 A powerful integration that connects Ultravox's AI voice capabilities with telephony services (Twilio and Telnyx) for creating intelligent voice agents capable of natural conversations over phone calls.
 
-## Features
+## Quick Start (5 minutes)
 
-- **Multi-Provider Support**: Works with both Twilio and Telnyx
-- **Inbound Call Handling**: Automatically answer and process incoming calls
-- **Outbound Call Initiation**: Programmatically make outgoing calls
-- **Web Interface**: User-friendly UI for making calls and managing knowledge bases
-- **Knowledge Base Integration**: RAG (Retrieval Augmented Generation) support with custom corpora
-- **Tool System**: Extensible tool framework for real-time data access
-- **Voice Customization**: Select from multiple AI voices
-- **System Prompt Control**: Customize AI behavior with detailed prompts
-- **Call Control**: Built-in hangUp tool for natural call termination
+1. Get your credentials ready:
+   - Ultravox API key from [Ultravox Dashboard](https://ultravox.ai)
+   - Either Twilio OR Telnyx credentials (see [Choosing a Provider](#choosing-a-provider))
 
-## Prerequisites
-
-- Node.js v16 or higher
-- Twilio account with phone number OR Telnyx account with phone number
-- Ultravox API key (from [Ultravox](https://ultravox.ai))
-- Public URL for webhook endpoints (for production)
-
-## Installation
-
-1. Clone the repository:
+2. Clone and install:
    ```bash
-   git clone https://github.com/yourusername/ultravox-integrations.git
+   git clone https://github.com/aipowergrid/ultravox-integrations.git
    cd ultravox-integrations/twilio
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
    ```
 
-3. Create environment configuration:
+3. Set up your environment:
    ```bash
    cp .env.template .env
+   # Edit .env with your credentials
    ```
 
-4. Edit the `.env` file with your credentials (see Configuration section)
-
-5. Start the server:
+4. Start the server:
    ```bash
    npm start
    ```
 
-## Configuration
+5. Open http://localhost:3000 in your browser
 
-The system is highly configurable through environment variables in the `.env` file:
+## Features
 
-### Core Configuration
+- 🎯 **Production Ready**: Enterprise-grade voice AI integration
+- 🔄 **Multi-Provider**: Works with both Twilio and Telnyx (telnyx wip)
+- 📞 **Full Call Control**: Handle inbound/outbound calls with ease
+- 🧠 **Knowledge Base**: Add custom knowledge to your AI with RAG corpus support
+- 🛠️ **Extensible Tools**: Real-time data access during calls
+- 🎤 **Voice Options**: Multiple AI voices to choose from
+- 🎭 **Customizable Behavior**: Fine-tune AI responses with system prompts
+- 🌐 **Modern UI**: Clean web interface for call management
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VOICE_PROVIDER` | Voice provider to use (`twilio` or `telnyx`) | `twilio` |
-| `PORT` | Port for the web server | `3000` |
+## Choosing a Provider
 
-### Twilio Configuration
+### Twilio
+- Easier to get started
+- More beginner-friendly
+- Higher per-minute costs
+- Get started at [Twilio](https://www.twilio.com/try-twilio)
 
-| Variable | Description |
-|----------|-------------|
-| `TWILIO_ACCOUNT_SID` | Your Twilio account SID |
-| `TWILIO_AUTH_TOKEN` | Your Twilio auth token |
-| `TWILIO_PHONE_NUMBER` | Your Twilio phone number (with country code) |
 
-### Telnyx Configuration
+## Prerequisites
 
-| Variable | Description |
-|----------|-------------|
-| `TELNYX_API_KEY` | Your Telnyx API key |
-| `TELNYX_PUBLIC_KEY` | Your Telnyx public key |
-| `TELNYX_APP_ID` | Your Telnyx application ID |
-| `TELNYX_PHONE_NUMBER` | Your Telnyx phone number (with country code) |
+- Node.js v16 or higher
+- npm v7 or higher
+- A Twilio account OR Telnyx account with:
+  - Account credentials
+  - At least one phone number
+- Ultravox API key
+- For production: A public URL for webhooks
 
-### Ultravox Configuration
+## Detailed Setup Guide
 
-| Variable | Description |
-|----------|-------------|
-| `ULTRAVOX_API_KEY` | Your Ultravox API key |
-| `ULTRAVOX_API_URL` | Ultravox API URL |
-| `ULTRAVOX_AGENT_ID` | Ultravox agent ID |
-| `ULTRAVOX_CORPUS_ID` | Default corpus ID for RAG (optional) |
+### 1. Environment Setup
 
-### AI Assistant Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AI_ASSISTANT_NAME` | Name of the AI assistant | `Jimothy` |
-| `AI_ASSISTANT_VOICE_ID` | Voice ID to use | Ultravox default |
-| `AI_TEMPERATURE` | Temperature for AI responses | `0.3` |
-| `INBOUND_FIRST_SPEAKER` | Who speaks first on inbound calls | `FIRST_SPEAKER_AGENT` |
-| `OUTBOUND_FIRST_SPEAKER` | Who speaks first on outbound calls | `FIRST_SPEAKER_USER` |
-| `INBOUND_SYSTEM_PROMPT` | System prompt for inbound calls | See template |
-| `OUTBOUND_SYSTEM_PROMPT` | System prompt for outbound calls | See template |
-
-### UI Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `UI_LOGO_URL` | URL for the logo in the web UI | Default logo |
-| `UI_APP_NAME` | Application name in the web UI | `AI Voice Agent` |
-
-### Tool System Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ULTRAVOX_USE_TOOLS` | Enable/disable the tool system | `false` |
-| `ULTRAVOX_USE_HANGUP` | Enable/disable the hangUp tool | `true` |
-| `ULTRAVOX_CALL_TOOLS` | Comma-separated list of tools to enable | Empty |
-
-## Usage
-
-### Web Interface
-
-Access the web interface at `http://localhost:3000` (or your deployed URL) to:
-
-1. Make outbound calls
-2. Create and manage knowledge bases
-3. Configure call settings
-
-### Inbound Calls
-
-1. Configure your Twilio/Telnyx phone number's webhook to point to:
-   - For both Twilio and Telnyx: `https://your-server.com/incoming`
-   
-   The system automatically detects the provider based on the request format.
-
-2. When someone calls your number, the system will automatically:
-   - Answer the call
-   - Connect to Ultravox
-   - Apply your configured system prompt
-   - Enable configured tools and RAG if specified
-
-### Outbound Calls
-
-#### Using the Web Interface
-
-1. Navigate to `http://localhost:3000`
-2. Fill in the phone number and optional parameters
-3. Click "Initiate Call"
-
-#### Using the API
-
+Create your `.env` file:
 ```bash
+cp .env.template .env
+```
+
+Required variables:
+```bash
+# Core settings
+VOICE_PROVIDER=twilio  # or telnyx
+PORT=3000
+
+# Ultravox settings (Required)
+ULTRAVOX_API_KEY=your_api_key
+ULTRAVOX_API_URL=https://api.ultravox.ai
+ULTRAVOX_AGENT_ID=your_agent_id
+
+# If using Twilio
+TWILIO_ACCOUNT_SID=your_sid
+TWILIO_AUTH_TOKEN=your_token
+TWILIO_PHONE_NUMBER=+1234567890
+
+# If using Telnyx
+TELNYX_API_KEY=your_key
+TELNYX_PUBLIC_KEY=your_public_key
+TELNYX_APP_ID=your_app_id
+TELNYX_PHONE_NUMBER=+1234567890
+```
+
+### 2. Local Development Setup
+
+For testing webhooks locally, use either:
+
+#### Option A: Cloudflare Tunnel (Recommended)
+```bash
+# Install cloudflared
+brew install cloudflared  # macOS
+# or
+curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared.deb  # Linux
+
+# Start tunnel
+cloudflared tunnel --url http://localhost:3000
+```
+
+#### Option B: ngrok
+```bash
+npm install -g ngrok
+ngrok http 3000
+```
+
+### 3. Configure Webhook URLs
+
+#### For Twilio:
+1. Go to [Twilio Console](https://console.twilio.com)
+2. Navigate to Phone Numbers → Manage → Active numbers
+3. Click your number
+4. Under "Voice & Fax", set:
+   - Webhook URL: `https://your-tunnel-url/incoming`
+   - Method: POST
+
+#### For Telnyx:
+1. Go to [Telnyx Portal](https://portal.telnyx.com)
+2. Navigate to Numbers → My Numbers
+3. Click your number
+4. Set webhook URL to: `https://your-tunnel-url/telnyx-webhook`
+
+## Usage Guide
+
+### Making Outbound Calls
+
+#### 1. Using the Web Interface
+1. Open http://localhost:3000
+2. Enter the destination phone number
+3. (Optional) Customize:
+   - Voice selection
+   - Knowledge base
+   - System prompt
+   - Tools
+4. Click "Initiate Call"
+
+#### 2. Using the API
+```bash
+# Example 1: With corpus enabled
 curl -X POST http://localhost:3000/outgoing \
   -H "Content-Type: application/json" \
   -d '{
     "destinationNumber": "+1234567890",
     "systemPrompt": "You are a helpful assistant...",
     "voiceId": "optional-voice-id",
-    "corpusId": "optional-corpus-id",
-    "tools": ["optional", "tool", "names"],
-    "agentName": "Optional Name"
+    "corpusId": "your-corpus-id",
+    "tools": ["optional", "tool", "names"]
+  }'
+
+# Example 2: With corpus disabled (either omit corpusId or set to null)
+curl -X POST http://localhost:3000/outgoing \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destinationNumber": "+1234567890",
+    "systemPrompt": "You are a helpful assistant...",
+    "voiceId": "optional-voice-id",
+    "corpusId": null,
+    "tools": ["optional", "tool", "names"]
   }'
 ```
 
-#### Using the CLI Tool
+Note: To disable the corpus (RAG) functionality:
+- Either omit the `corpusId` field completely
+- Or explicitly set `"corpusId": null`
+- This will override any default corpus set in your `.env` file
 
-```bash
-node outbound-call.js
-```
+### Setting Up Knowledge Bases
 
-Follow the prompts to enter a phone number and optional system prompt.
+1. From the web interface:
+   - Scroll to "Create Knowledge Base Corpus"
+   - Enter corpus name
+   - Add URLs to include (documentation, GitHub READMEs, etc.)
+   - Click "Create Corpus"
 
-## Tool System
-
-The system supports an extensible tool framework that allows the AI to access real-time data during calls.
-
-### Built-in Tools
-
-- **hangUp**: Allows the AI to end the call naturally (enabled by default)
-- **queryCorpus**: Automatically added when a corpus is configured
-
-### Custom Tools
-
-You can define custom tools in your `.env` file:
-
-```
-ULTRAVOX_TOOL_1_NAME=weather
-ULTRAVOX_TOOL_1_DESCRIPTION=Get current weather for a location
-ULTRAVOX_TOOL_1_URL=https://api.example.com/weather
-ULTRAVOX_TOOL_1_METHOD=GET
-ULTRAVOX_TOOL_1_PARAMS=[{"name":"location","location":"PARAMETER_LOCATION_QUERY","schema":{"type":"string"},"required":true}]
-```
-
-See `README.TOOLS.md` for detailed information on configuring tools.
-
-## Knowledge Base (RAG) Support
-
-The system supports Retrieval Augmented Generation (RAG) through Ultravox corpora:
-
-1. Create a corpus through the web interface or Ultravox API
-2. Add URLs or documents to the corpus
-3. Use the corpus in calls by:
-   - Selecting it in the web interface
+2. Use in calls by:
+   - Selecting from dropdown in web interface
    - Setting `ULTRAVOX_CORPUS_ID` in `.env`
-   - Passing `corpusId` in the API call
+   - Including in API calls
 
-## Development
+## Common Issues & Solutions
 
-For local development with webhooks, you can use either Cloudflare Tunnel or ngrok:
+| Issue | Solution |
+|-------|----------|
+| Call not connecting | Double-check credentials in `.env` |
+| No audio | Verify phone number format (E.164) |
+| Webhook errors | Ensure tunnel URL is correct and server is running |
+| Tools not working | Set `ULTRAVOX_USE_TOOLS=true` in `.env` |
+| RAG not working | Wait for corpus to show "READY" status |
+| Cloudflare "Too Many Redirects" | 1. Check your Express app isn't forcing HTTPS redirects<br>2. Ensure no conflicting proxy settings in your code<br>3. Remove any URL rewriting middleware<br>4. If using app.use(express.static(...)), place it after your routes<br>5. Check for circular redirects in your routing logic |
 
-### Using Cloudflare Tunnel (Recommended)
+### Common Cloudflare Tunnel Issues
 
-1. Install the Cloudflare Tunnel client:
-   ```bash
-   # On macOS
-   brew install cloudflared
-   
-   # On Linux
-   curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-   sudo dpkg -i cloudflared.deb
-   
-   # On Windows (using Powershell)
-   Invoke-WebRequest -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.msi -OutFile cloudflared.msi
-   Start-Process msiexec.exe -ArgumentList '/i', 'cloudflared.msi', '/quiet' -Wait
+#### Too Many Redirects
+If you're seeing "Too Many Redirects" with Cloudflare Tunnel:
+
+1. **Check your Express configuration**:
+   ```javascript
+   // Remove or modify any forced HTTPS redirects
+   // DON'T use code like this with Cloudflare Tunnel:
+   app.use((req, res, next) => {
+     if (!req.secure) {
+       return res.redirect('https://' + req.headers.host + req.url);
+     }
+     next();
+   });
    ```
 
-2. Start your server:
-   ```bash
-   npm start
+2. **Verify your middleware order**:
+   ```javascript
+   // CORRECT order:
+   app.use(express.json());
+   app.use(routes);  // Your route handlers
+   app.use(express.static('public'));  // Static files last
    ```
 
-3. In another terminal, start Cloudflare Tunnel:
-   ```bash
-   cloudflared tunnel --url http://localhost:3000
+3. **Check for proxy settings**:
+   ```javascript
+   // If needed, configure trust proxy correctly:
+   app.set('trust proxy', true);  // Only if behind a proxy
    ```
 
-4. Configure your Twilio/Telnyx webhook with the Cloudflare Tunnel URL provided (https://[random]-[random].trycloudflare.com)
-
-### Using ngrok
-
-1. Install ngrok:
+4. **Temporary Debug Solution**:
    ```bash
-   npm install -g ngrok
+   # Start cloudflared with insecure mode (temporary debug only)
+   cloudflared tunnel --no-tls-verify --url http://localhost:3000
    ```
 
-2. Start your server:
-   ```bash
-   npm start
-   ```
-
-3. In another terminal, start ngrok:
-   ```bash
-   ngrok http 3000
-   ```
-
-4. Configure your Twilio/Telnyx webhook with the ngrok URL provided
-
-## Troubleshooting
-
-### Common Issues
-
-- **Call not connecting**: Check your Twilio/Telnyx and Ultravox credentials
-- **No audio**: Ensure your phone number is properly configured
-- **Tools not working**: Check `ULTRAVOX_USE_TOOLS` is set to `true`
-- **RAG not working**: Verify corpus exists and is in READY state
-- **hangUp tool not working**: Ensure `ULTRAVOX_USE_HANGUP` is not set to `false`
-
-### Logs
-
-Check the server logs for detailed error messages and debugging information.
-
-## API Endpoints
+## API Reference
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Home page with web interface |
-| `/health` | GET | Health check endpoint |
-| `/config` | GET | UI configuration |
-| `/incoming` | POST | Webhook for incoming Twilio calls |
-| `/telnyx-webhook` | POST | Webhook for Telnyx events |
-| `/outgoing` | POST | Initiate outbound calls |
+| `/outgoing` | POST | Start outbound call |
+| `/incoming` | POST | Handle inbound calls |
 | `/voices` | GET | List available voices |
-| `/list-corpora` | GET | List available corpora |
-| `/create-corpus` | POST | Create a new corpus |
-| `/corpus/:corpusId` | DELETE | Delete a corpus |
-| `/test-telnyx` | GET | Test Telnyx configuration |
+| `/list-corpora` | GET | List knowledge bases |
+| `/create-corpus` | POST | Create knowledge base |
+| `/corpus/:id` | DELETE | Delete knowledge base |
+| `/health` | GET | Service health check |
+
+For detailed API documentation, see our [API Guide](docs/API.md).
+
+## Support & Community
+
+- 📚 [Documentation](https://docs.ultravox.ai)
+- 💬 [Discord Community](https://discord.gg/ultravox)
+- 🐛 [Issue Tracker](https://github.com/aipowergrid/ultravox-integrations/issues)
+- 📧 [Email Support](mailto:support@ultravox.ai)
 
 ## License
 
@@ -289,5 +260,5 @@ Check the server logs for detailed error messages and debugging information.
 
 ## Acknowledgements
 
-- [Ultravox](https://ultravox.ai) for the AI voice technology
-- [Twilio](https://twilio.com) and [Telnyx](https://telnyx.com) for telephony services 
+- [Ultravox](https://ultravox.ai) for voice AI technology
+- [Twilio](https://twilio.com) and [Telnyx](https://telnyx.com) for telephony services

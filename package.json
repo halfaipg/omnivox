@@ -13,6 +13,8 @@
     "axios": "^1.6.7",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-fileupload": "^1.5.1",
+    "form-data": "^4.0.2",
     "node-fetch": "^3.3.2",
     "telnyx": "^1.25.0",
     "twilio": "^5.4.0",
@@ -21,4 +23,4 @@
   "devDependencies": {
     "nodemon": "^3.0.3"
   }
-} 
+}

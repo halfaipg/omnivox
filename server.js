@@ -9,6 +9,8 @@ import { getToolsForCall } from './utils/tool-manager.js';
 import { tools } from './config/tools.js';
 import axios from 'axios';
 import { WebSocketServer } from 'ws';
+import fileUpload from 'express-fileupload';
+import FormData from 'form-data';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -17,6 +19,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(fileUpload({
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max file size
+    abortOnLimit: true
+}));
 
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -464,7 +470,8 @@ app.get('/config', (req, res) => {
     res.json({
         logoUrl: UI_LOGO_URL,
         appName: UI_APP_NAME,
-        provider: VOICE_PROVIDER.toUpperCase()
+        provider: VOICE_PROVIDER.toUpperCase(),
+        sectionPassword: process.env.UI_SECTION_PASSWORD || 'demo123'
     });
 });
 
@@ -992,6 +999,290 @@ app.get('/voices', async (req, res) => {
             error: 'Failed to fetch voices', 
             message: error.message,
             results: [] // Always provide an empty results array for the frontend
+        });
+    }
+});
+
+// Delete voice endpoint
+app.delete('/voice/:voiceId', async (req, res) => {
+    try {
+        const { voiceId } = req.params;
+        
+        if (!voiceId) {
+            return res.status(400).json({ error: 'Voice ID is required' });
+        }
+        
+        // Delete the voice via Ultravox API
+        await axios({
+            method: 'DELETE',
+            url: `${ULTRAVOX_API_URL.replace('/calls', '')}/voices/${voiceId}`,
+            headers: {
+                'X-API-Key': ULTRAVOX_API_KEY
+            }
+        });
+        
+        res.json({
+            success: true,
+            message: `Voice ${voiceId} deleted successfully`
+        });
+        
+    } catch (error) {
+        console.error('Error deleting voice:', error);
+        res.status(500).json({ 
+            error: 'Failed to delete voice', 
+            message: error.message,
+            details: error.response?.data
+        });
+    }
+});
+
+// Voice Cloning Endpoint
+app.post('/clone-voice', async (req, res) => {
+    try {
+        console.log('Received voice cloning request:', req.body);
+        console.log('Files:', req.files);
+        
+        if (!req.files || !req.files.audioFile) {
+            return res.status(400).json({ error: 'No audio file provided' });
+        }
+
+        const audioFile = req.files.audioFile;
+        const voiceName = req.body.name || req.body.voiceName;
+        const voiceDescription = req.body.description || req.body.voiceDescription;
+
+        if (!voiceName) {
+            return res.status(400).json({ error: 'Voice name is required' });
+        }
+
+        // First, get list of existing voices
+        try {
+            const voicesResponse = await axios({
+                method: 'GET',
+                url: `${ULTRAVOX_API_URL.replace('/calls', '')}/voices`,
+                headers: {
+                    'X-API-Key': ULTRAVOX_API_KEY
+                }
+            });
+
+            // Delete any existing cloned voices
+            if (voicesResponse.data && voicesResponse.data.results) {
+                const clonedVoices = voicesResponse.data.results.filter(voice => 
+                    // Look for cloned voices by description or ownership
+                    (voice.description && voice.description.toLowerCase().includes('cloned')) ||
+                    (voice.ownership === 'private') ||
+                    (voice.name && voice.name.toLowerCase().includes('cloned'))
+                );
+                console.log(`Found ${clonedVoices.length} existing cloned/custom voices to delete:`, 
+                    clonedVoices.map(v => ({id: v.voiceId, name: v.name, description: v.description, ownership: v.ownership}))
+                );
+                
+                // Delete each cloned voice
+                for (const voice of clonedVoices) {
+                    try {
+                        console.log(`Attempting to delete voice: ${voice.voiceId} (${voice.name})`);
+                        const deleteResponse = await axios({
+                            method: 'DELETE',
+                            url: `${ULTRAVOX_API_URL.replace('/calls', '')}/voices/${voice.voiceId}`,
+                            headers: {
+                                'X-API-Key': ULTRAVOX_API_KEY
+                            }
+                        });
+                        console.log(`Delete response status: ${deleteResponse.status}`);
+                        console.log(`Successfully deleted voice: ${voice.voiceId}`);
+                        
+                        // Increase delay after successful deletion to 5 seconds
+                        console.log('Waiting 5 seconds for deletion to propagate...');
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        
+                        // Add multiple verification attempts with detailed logging
+                        let verificationAttempts = 3;
+                        while (verificationAttempts > 0) {
+                            try {
+                                console.log(`Verification attempt ${4 - verificationAttempts} for voice ${voice.voiceId}`);
+                                const verifyResponse = await axios({
+                                    method: 'GET',
+                                    url: `${ULTRAVOX_API_URL.replace('/calls', '')}/voices/${voice.voiceId}`,
+                                    headers: {
+                                        'X-API-Key': ULTRAVOX_API_KEY
+                                    }
+                                });
+                                
+                                if (verifyResponse.status === 200) {
+                                    // If we get here, the voice still exists
+                                    console.log(`Voice ${voice.voiceId} still exists (status: ${verifyResponse.status}), waiting...`);
+                                    await new Promise(resolve => setTimeout(resolve, 3000));
+                                    verificationAttempts--;
+                                    if (verificationAttempts === 0) {
+                                        throw new Error(`Voice ${voice.voiceId} still exists after multiple verification attempts`);
+                                    }
+                                }
+                            } catch (verifyError) {
+                                if (verifyError.response?.status === 404) {
+                                    // 404 means the voice is truly deleted
+                                    console.log(`✅ Verified deletion of voice ${voice.voiceId} (got 404 response)`);
+                                    verificationAttempts = 0; // Exit the loop
+                                } else {
+                                    console.error(`Error during verification:`, verifyError.response?.status, verifyError.message);
+                                    throw verifyError;
+                                }
+                            }
+                        }
+                    } catch (deleteError) {
+                        if (deleteError.response?.status === 404) {
+                            // Voice already deleted, this is fine
+                            console.log(`Voice ${voice.voiceId} already deleted (404 response)`);
+                        } else {
+                            console.error(`Error deleting voice ${voice.voiceId}:`, {
+                                status: deleteError.response?.status,
+                                message: deleteError.message,
+                                data: deleteError.response?.data
+                            });
+                            throw deleteError;
+                        }
+                    }
+                }
+                
+                // Double check no cloned voices exist
+                console.log('Performing final verification of all voices...');
+                const finalCheckResponse = await axios({
+                    method: 'GET',
+                    url: `${ULTRAVOX_API_URL.replace('/calls', '')}/voices`,
+                    headers: {
+                        'X-API-Key': ULTRAVOX_API_KEY
+                    }
+                });
+                
+                const remainingClonedVoices = finalCheckResponse.data.results.filter(voice => voice.type === 'VOICE_TYPE_CLONED');
+                if (remainingClonedVoices.length > 0) {
+                    console.error('❌ Still found cloned voices after deletion:', remainingClonedVoices);
+                    throw new Error('Failed to delete all cloned voices');
+                } else {
+                    console.log('✅ Final verification complete - no cloned voices remain');
+                }
+            }
+        } catch (listError) {
+            console.error('Error managing existing voices:', listError);
+            return res.status(500).json({
+                error: 'Failed to prepare for voice cloning',
+                message: 'Could not manage existing voices. Please try again in a few moments.'
+            });
+        }
+
+        // Create new voice
+        console.log(`Creating new voice: ${voiceName}, file: ${audioFile.name}, size: ${audioFile.size} bytes`);
+
+        // Create FormData for the Ultravox API request
+        const formData = new FormData();
+        formData.append('name', voiceName);
+        if (voiceDescription) {
+            formData.append('description', voiceDescription);
+        }
+        
+        // Append the file with the correct field name expected by Ultravox API
+        formData.append('file', audioFile.data, {
+            filename: audioFile.name,
+            contentType: audioFile.mimetype
+        });
+
+        const apiUrl = `${ULTRAVOX_API_URL.replace('/calls', '')}/voices`;
+        console.log(`Sending request to Ultravox API: ${apiUrl}`);
+
+        // Make request to Ultravox API with retries
+        let retries = 3;
+        let lastError;
+        let createdVoice = null;
+        
+        while (retries > 0 && !createdVoice) {
+            try {
+                console.log(`Attempting to create voice (${retries} retries left)...`);
+                const response = await axios.post(apiUrl, formData, {
+                    headers: {
+                        ...formData.getHeaders(),
+                        'X-API-Key': ULTRAVOX_API_KEY
+                    },
+                    maxContentLength: Infinity,
+                    maxBodyLength: Infinity
+                });
+
+                // Verify the voice was created by fetching it
+                if (response.data && response.data.voiceId) {
+                    try {
+                        // Wait a moment before verifying
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        const verifyResponse = await axios({
+                            method: 'GET',
+                            url: `${ULTRAVOX_API_URL.replace('/calls', '')}/voices/${response.data.voiceId}`,
+                            headers: {
+                                'X-API-Key': ULTRAVOX_API_KEY
+                            }
+                        });
+                        
+                        if (verifyResponse.data) {
+                            console.log('Voice creation verified:', verifyResponse.data);
+                            createdVoice = verifyResponse.data;
+                        }
+                    } catch (verifyError) {
+                        console.error('Error verifying voice creation:', verifyError.message);
+                        throw new Error('Voice created but could not be verified');
+                    }
+                }
+
+                return res.json({
+                    success: true,
+                    message: 'Voice cloned successfully',
+                    voice: createdVoice || response.data
+                });
+            } catch (error) {
+                lastError = error;
+                console.error('Voice creation attempt failed:', error.message);
+                
+                if (error.response?.status === 409) {
+                    console.log('Conflict detected, retrying after delay...');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    retries--;
+                } else if (error.response?.status === 400) {
+                    // Don't retry on bad request
+                    throw new Error('Invalid request: ' + (error.response.data?.message || error.message));
+                } else {
+                    retries--;
+                    if (retries > 0) {
+                        // Wait longer between retries for other errors
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                }
+            }
+        }
+        
+        // If we get here, all retries failed
+        throw lastError || new Error('Failed to create voice after multiple attempts');
+
+    } catch (error) {
+        console.error('Error cloning voice:', error);
+        
+        // More detailed error logging
+        if (error.response) {
+            console.error('API response error:', {
+                status: error.response.status,
+                data: error.response.data,
+                headers: error.response.headers
+            });
+        }
+        
+        // Send appropriate error message based on status code
+        let errorMessage = error.response?.data?.message || error.message;
+        if (error.response?.status === 409) {
+            errorMessage = 'A voice clone already exists. Please try again in a few moments.';
+        } else if (error.response?.status === 400) {
+            errorMessage = 'Invalid request: ' + (error.response.data?.message || 'Please check your input');
+        } else if (error.response?.status === 413) {
+            errorMessage = 'Audio file is too large. Maximum size is 10MB.';
+        }
+        
+        res.status(500).json({
+            error: 'Failed to clone voice',
+            message: errorMessage,
+            details: error.response?.data
         });
     }
 });
