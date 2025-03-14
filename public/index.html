@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Loading...</title>
+    <title></title>
     <script>
         // Immediately fetch config and update title
         (async function() {
@@ -46,6 +46,10 @@
             --text-primary: #121212;
             --text-secondary: #555555;
             --text-labels: #333333;
+            --accent-color: #5c7d99; /* Cool blue-grey tone */
+            --accent: #5c7d99; /* Cool blue-grey tone */
+            --accent-hover: #4e6b84; /* Slightly darker blue-grey for hover */
+            --success: #5c7d99; /* Matching blue-grey for success state */
             --input-bg: rgba(240, 240, 240, 0.9);
             --input-border: rgba(200, 200, 200, 0.8);
             --shadow-subtle: 0 8px 16px rgba(0, 0, 0, 0.1);
@@ -270,6 +274,19 @@
             }
             100% {
                 box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+            }
+        }
+
+        /* Light mode pulse animation */
+        @keyframes pulse-light {
+            0% {
+                box-shadow: 0 0 0 0 rgba(92, 125, 153, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(92, 125, 153, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(92, 125, 153, 0);
             }
         }
 
@@ -1124,14 +1141,238 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
             color: var(--text-primary) !important;
         }
+
+        :root.light-mode .result {
+            background-color: rgba(92, 125, 153, 0.08);
+        }
+        
+        :root.light-mode .result.success {
+            background-color: rgba(92, 125, 153, 0.08);
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+            }
+        }
+        
+        /* Light mode pulse animation */
+        :root.light-mode .recording .mic-button {
+            animation: light-mode-pulse 2s ease infinite;
+        }
+        
+        @keyframes light-mode-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(92, 125, 153, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(92, 125, 153, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(92, 125, 153, 0);
+            }
+        }
+
+        /* Tab Navigation Styles */
+        .tabs-container {
+            width: 100%;
+            max-width: 640px;
+            margin-bottom: 15px;
+        }
+
+        .tab-navigation {
+            display: flex;
+            background-color: var(--bg-tertiary);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 1px solid var(--input-border);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px 15px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            text-align: center;
+            box-shadow: none;
+            border-radius: 0;
+            margin: 0;
+            position: relative;
+        }
+
+        .tab-button:hover {
+            background-color: rgba(92, 125, 153, 0.1);
+            color: var(--text-primary);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .tab-button.active {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        .tab-button.active:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* WebRTC Call Section Styles */
+        .webrtc-controls {
+            margin-top: 25px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .call-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--accent);
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .call-button svg {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .call-button.start-call {
+            background-color: var(--accent);
+        }
+
+        .call-button.end-call {
+            background-color: var(--error-color);
+        }
+
+        .call-button.mute-call {
+            background-color: var(--bg-tertiary);
+        }
+
+        .call-button.mute-call.active {
+            background-color: #ffa726;
+        }
+
+        .call-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .call-button:active {
+            transform: scale(0.95);
+        }
+
+        .call-status {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .call-transcript {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background-color: var(--bg-tertiary);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .call-transcript p {
+            margin: 8px 0;
+        }
+
+        .call-transcript .agent {
+            color: var(--accent);
+        }
+
+        .call-transcript .user {
+            color: var(--text-primary);
+        }
+
+        .hidden-control {
+            display: none;
+        }
+
+        .show-control {
+            display: flex;
+        }
+
+        /* Transcript Styles */
+        .transcript-message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .transcript-message.agent {
+            background-color: rgba(92, 125, 153, 0.1);
+            margin-right: 25px;
+        }
+
+        .transcript-message.user {
+            background-color: rgba(76, 175, 80, 0.1);
+            margin-left: 25px;
+        }
+
+        .transcript-speaker {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .transcript-text {
+            color: var(--text-primary);
+        }
+
+        /* Import Map for LiveKit Client */
+        #livelibsimportmap {
+            display: none;
+        }
     </style>
+    <script type="importmap" id="livelibsimportmap">
+        {
+            "imports": {
+                "livekit-client": "https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.esm.mjs"
+            }
+        }
+    </script>
 </head>
 <body>
     <div class="header">
         <div class="logo-container">
             <img id="appLogo" src="https://brand.aipowergrid.io/_data/i/upload/2024/03/14/20240314185634-06dfd4e5-2s.png" alt="App Logo" class="logo">
         </div>
-        <h1 id="appName">AI Voice Agent</h1>
+        <h1 id="appName">OmniVox</h1>
         
         <!-- Theme toggle switch -->
         <div class="theme-switch-wrapper">
@@ -1160,7 +1401,81 @@
         </div>
     </div>
 
-    <div class="container">
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="webrtc">Web Call</button>
+            <button class="tab-button" data-tab="phone">Phone Call</button>
+        </div>
+    </div>
+
+    <!-- WebRTC Call Container -->
+    <div id="webrtc-tab" class="container tab-content active">
+        <h2>Web Call</h2>
+        <div>
+            <div>
+                <label for="webrtc-voiceId">Voice</label>
+                <select id="webrtc-voiceId" name="webrtc-voiceId">
+                    <option value="">Loading voices...</option>
+                </select>
+                <small class="help-text">Select a voice for the AI assistant</small>
+            </div>
+            <div>
+                <label for="webrtc-corpusId">Knowledge Base (optional)</label>
+                <div class="corpus-container">
+                    <select id="webrtc-corpusId" name="webrtc-corpusId">
+                        <option value="">No corpus (RAG disabled)</option>
+                        <!-- Corpus options will be loaded dynamically -->
+                    </select>
+                </div>
+                <small class="help-text corpus-help-text">Select a knowledge base corpus or none to disable RAG</small>
+            </div>
+            <div>
+                <label for="webrtc-agentName">Agent Name</label>
+                <input type="text" id="webrtc-agentName" name="webrtc-agentName" placeholder="Leave empty to use default (Loddie)">
+                <small class="help-text">The name agent will introduce itself as</small>
+            </div>
+            <div>
+                <label for="webrtc-systemPrompt">System Prompt</label>
+                <textarea id="webrtc-systemPrompt" name="webrtc-systemPrompt" rows="6" placeholder="Leave empty to use default system prompt"></textarea>
+                <small class="help-text">Optional: Customize the AI's behavior with a specific prompt</small>
+            </div>
+
+            <!-- Call Controls -->
+            <div class="webrtc-controls">
+                <button id="start-call" class="call-button start-call">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                </button>
+                <button id="mute-call" class="call-button mute-call hidden-control">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                </button>
+                <button id="end-call" class="call-button end-call hidden-control">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"></path>
+                        <line x1="23" y1="1" x2="1" y2="23"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div id="call-status" class="call-status">
+                Ready to start call
+            </div>
+
+            <div id="call-transcript" class="call-transcript">
+                <p>Transcript will appear here during the call.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone Call Container (Original Outbound Call Section) -->
+    <div id="phone-tab" class="container tab-content">
         <h2>Make Outbound Call</h2>
         <form id="outboundForm">
             <div>
@@ -1302,7 +1617,7 @@ Leave empty to use the above prompt."></textarea>
 
             <form id="voiceCloneForm">
                 <div>
-                    <label for="voiceName">Voice Name</label>
+                    <label for="voiceName">Voice Name (required)</label>
                     <input type="text" id="voiceName" name="voiceName" placeholder="My Custom Voice" required>
                 </div>
                 <div>
@@ -1345,27 +1660,27 @@ Leave empty to use the above prompt."></textarea>
         </div>
         
         <div class="section-content" id="corpusContent">
-            <form id="corpusForm">
-                <div>
-                    <label for="corpusName">Corpus Name</label>
-                    <input type="text" id="corpusName" name="corpusName" placeholder="MyKnowledgeBase" required>
-                </div>
-                <div>
-                    <label for="corpusDescription">Description (optional)</label>
-                    <input type="text" id="corpusDescription" name="corpusDescription" placeholder="Description of this knowledge base">
-                </div>
-                <div>
-                    <label for="corpusUrls">Website URLs</label>
-                    <textarea id="corpusUrls" name="corpusUrls" rows="3" placeholder="https://example.com/page1,&#10;https://github.com/username/repo/README.md,&#10;https://docs.yourdomain.com/info"></textarea>
-                    <small class="help-text">Add comma-separated URLs for websites you want to include in this corpus. Best with informative text content like documentation and GitHub README files.</small>
-                </div>
-                <div class="form-group">
-                    <button type="submit" id="createCorpusBtn">Create Corpus<span id="corpusLoadingSpinner" class="spinner hidden"></span></button>
-                </div>
-            </form>
-            <div id="corpusResult" class="result hidden">
-                <h3>Corpus Creation Result:</h3>
-                <pre id="corpusResultContent"></pre>
+        <form id="corpusForm">
+            <div>
+                <label for="corpusName">Corpus Name</label>
+                <input type="text" id="corpusName" name="corpusName" placeholder="MyKnowledgeBase" required>
+            </div>
+            <div>
+                <label for="corpusDescription">Description (optional)</label>
+                <input type="text" id="corpusDescription" name="corpusDescription" placeholder="Description of this knowledge base">
+            </div>
+            <div>
+                <label for="corpusUrls">Website URLs</label>
+                <textarea id="corpusUrls" name="corpusUrls" rows="3" placeholder="https://example.com/page1,&#10;https://github.com/username/repo/README.md,&#10;https://docs.yourdomain.com/info"></textarea>
+                <small class="help-text">Add comma-separated URLs for websites you want to include in this corpus. Best with informative text content like documentation and GitHub README files.</small>
+            </div>
+            <div class="form-group">
+                <button type="submit" id="createCorpusBtn">Create Corpus<span id="corpusLoadingSpinner" class="spinner hidden"></span></button>
+            </div>
+        </form>
+        <div id="corpusResult" class="result hidden">
+            <h3>Corpus Creation Result:</h3>
+            <pre id="corpusResultContent"></pre>
             </div>
         </div>
     </div>
@@ -1591,6 +1906,9 @@ Leave empty to use the above prompt."></textarea>
                 
                 const data = await response.json();
                 
+                // Save the data to a global property for access by other functions
+                window.voicesData = data;
+                
                 const voiceSelect = document.getElementById('voiceId');
                 if (!voiceSelect) return;
                 
@@ -1634,13 +1952,16 @@ Leave empty to use the above prompt."></textarea>
                         option.selected = true;
                     }
                 }
+                
                 console.log('Voices loaded successfully');
+                return data;
             } catch (error) {
                 console.error('Error loading voices:', error);
                 const voiceSelect = document.getElementById('voiceId');
                 if (voiceSelect) {
                     voiceSelect.innerHTML = '<option value="">Error loading voices</option>';
                 }
+                return null;
             }
         }
 
@@ -2508,5 +2829,327 @@ Leave empty to use the above prompt."></textarea>
             setupPasswordProtection('corpus');
         });
     </script>
+
+    <!-- WebRTC Tab and Call Functionality -->
+    <script type="module">
+        // Import the UltravoxSession from the JS file loaded by the server
+        let UltravoxSession;
+        
+        // We'll dynamically load the appropriate module when needed
+        async function loadUltravoxSDK() {
+            try {
+                // Import the Ultravox client SDK
+                const { UltravoxSession: UVSession } = await import('/ultravox-sdk/esm/index.js');
+                UltravoxSession = UVSession;
+                console.log('Ultravox SDK loaded successfully');
+                return true;
+            } catch (error) {
+                console.error('Error loading Ultravox SDK:', error);
+                return false;
+            }
+        }
+
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabName = button.getAttribute('data-tab');
+                    
+                    // Update active button
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Update active content
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === `${tabName}-tab`) {
+                            content.classList.add('active');
+                        }
+                    });
+                });
+            });
+
+            // Load Ultravox SDK
+            loadUltravoxSDK();
+
+            // Synchronize dropdown selections between tabs
+            const voiceIdSelect = document.getElementById('voiceId');
+            const webrtcVoiceIdSelect = document.getElementById('webrtc-voiceId');
+            
+            if (voiceIdSelect && webrtcVoiceIdSelect) {
+                // Sync voice selections
+                voiceIdSelect.addEventListener('change', () => {
+                    webrtcVoiceIdSelect.value = voiceIdSelect.value;
+                });
+                
+                webrtcVoiceIdSelect.addEventListener('change', () => {
+                    voiceIdSelect.value = webrtcVoiceIdSelect.value;
+                });
+            }
+            
+            const corpusIdSelect = document.getElementById('corpusId');
+            const webrtcCorpusIdSelect = document.getElementById('webrtc-corpusId');
+            
+            if (corpusIdSelect && webrtcCorpusIdSelect) {
+                // Sync corpus selections
+                corpusIdSelect.addEventListener('change', () => {
+                    webrtcCorpusIdSelect.value = corpusIdSelect.value;
+                });
+                
+                webrtcCorpusIdSelect.addEventListener('change', () => {
+                    corpusIdSelect.value = webrtcCorpusIdSelect.value;
+                });
+            }
+
+            // Set up WebRTC call controls
+            setupWebRTCCallControls();
+        });
+
+        // Global call session
+        let callSession = null;
+        let callActive = false;
+
+        // Function to set up WebRTC call controls
+        function setupWebRTCCallControls() {
+            const startCallButton = document.getElementById('start-call');
+            const muteCallButton = document.getElementById('mute-call');
+            const endCallButton = document.getElementById('end-call');
+            const callStatus = document.getElementById('call-status');
+            const callTranscript = document.getElementById('call-transcript');
+            
+            if (!startCallButton || !muteCallButton || !endCallButton || !callStatus || !callTranscript) {
+                console.error('WebRTC call controls not found');
+                return;
+            }
+            
+            // Start call button click handler
+            startCallButton.addEventListener('click', async () => {
+                if (callActive) return;
+                
+                try {
+                    callStatus.textContent = 'Initializing call...';
+                    
+                    // Get call parameters from form
+                    const voiceId = document.getElementById('webrtc-voiceId').value;
+                    const corpusId = document.getElementById('webrtc-corpusId').value;
+                    const agentName = document.getElementById('webrtc-agentName').value;
+                    const systemPrompt = document.getElementById('webrtc-systemPrompt').value;
+                    
+                    // Create request body
+                    const requestBody = {
+                        voiceId: voiceId || undefined,
+                        corpusId: corpusId || null,
+                        agentName: agentName || undefined,
+                        systemPrompt: systemPrompt || undefined,
+                        medium: 'webRtc'
+                    };
+                    
+                    // Get a join URL from the server
+                    const response = await fetch('/webrtc-join-url', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (!data.joinUrl) {
+                        throw new Error('No join URL provided');
+                    }
+                    
+                    callStatus.textContent = 'Connecting to call...';
+                    
+                    // Create new call session
+                    if (!UltravoxSession) {
+                        await loadUltravoxSDK();
+                        if (!UltravoxSession) {
+                            throw new Error('Could not load Ultravox SDK');
+                        }
+                    }
+                    
+                    // Create and initialize the session
+                    callSession = new UltravoxSession();
+                    
+                    // Set up event listeners for call status changes
+                    callSession.addEventListener('status', (event) => {
+                        callStatus.textContent = `Call status: ${callSession.status}`;
+                    });
+                    
+                    // Set up transcript updates
+                    callSession.addEventListener('transcripts', (event) => {
+                        updateTranscript(callSession.transcripts);
+                    });
+                    
+                    // Join the call
+                    callSession.joinCall(data.joinUrl);
+                    
+                    // Update UI for active call
+                    callActive = true;
+                    startCallButton.classList.add('hidden-control');
+                    muteCallButton.classList.remove('hidden-control');
+                    muteCallButton.classList.add('show-control');
+                    endCallButton.classList.remove('hidden-control');
+                    endCallButton.classList.add('show-control');
+                    
+                    // Clear transcript
+                    callTranscript.innerHTML = '<p>Call connected. Start speaking to begin conversation.</p>';
+                    
+                } catch (error) {
+                    console.error('Error starting call:', error);
+                    callStatus.textContent = `Error: ${error.message}`;
+                    callTranscript.innerHTML = `<p>Failed to start call: ${error.message}</p>`;
+                }
+            });
+            
+            // Mute button click handler
+            muteCallButton.addEventListener('click', () => {
+                if (!callSession) return;
+                
+                if (callSession.isMicMuted) {
+                    callSession.unmuteMic();
+                    muteCallButton.classList.remove('active');
+                } else {
+                    callSession.muteMic();
+                    muteCallButton.classList.add('active');
+                }
+            });
+            
+            // End call button click handler
+            endCallButton.addEventListener('click', async () => {
+                if (!callSession) return;
+                
+                try {
+                    callStatus.textContent = 'Ending call...';
+                    
+                    // Leave the call
+                    await callSession.leaveCall();
+                    
+                    // Reset state
+                    callSession = null;
+                    callActive = false;
+                    
+                    // Update UI
+                    startCallButton.classList.remove('hidden-control');
+                    muteCallButton.classList.add('hidden-control');
+                    muteCallButton.classList.remove('show-control', 'active');
+                    endCallButton.classList.add('hidden-control');
+                    endCallButton.classList.remove('show-control');
+                    
+                    callStatus.textContent = 'Call ended';
+                    
+                } catch (error) {
+                    console.error('Error ending call:', error);
+                    callStatus.textContent = `Error ending call: ${error.message}`;
+                }
+            });
+        }
+
+        // Function to update transcript display
+        function updateTranscript(transcripts) {
+            const callTranscript = document.getElementById('call-transcript');
+            if (!callTranscript) return;
+            
+            // Clear current transcript
+            callTranscript.innerHTML = '';
+            
+            // Add each transcript to the display
+            transcripts.forEach(transcript => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `transcript-message ${transcript.speaker.toLowerCase()}`;
+                
+                const speakerDiv = document.createElement('div');
+                speakerDiv.className = 'transcript-speaker';
+                speakerDiv.textContent = transcript.speaker === 'AGENT' ? 'AI Assistant' : 'You';
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'transcript-text';
+                textDiv.textContent = transcript.text;
+                
+                messageDiv.appendChild(speakerDiv);
+                messageDiv.appendChild(textDiv);
+                
+                callTranscript.appendChild(messageDiv);
+            });
+            
+            // Scroll to bottom
+            callTranscript.scrollTop = callTranscript.scrollHeight;
+        }
+
+        // Function to update WebRTC voice dropdown when voices are loaded
+        function updateWebRTCVoiceDropdown(voices) {
+            const webrtcVoiceIdSelect = document.getElementById('webrtc-voiceId');
+            if (!webrtcVoiceIdSelect) return;
+            
+            // Copy options from main voice dropdown
+            const voiceIdSelect = document.getElementById('voiceId');
+            if (voiceIdSelect && voiceIdSelect.options.length > 0) {
+                webrtcVoiceIdSelect.innerHTML = voiceIdSelect.innerHTML;
+            } else if (voices && voices.length > 0) {
+                // Direct update if voices array is provided
+                webrtcVoiceIdSelect.innerHTML = '';
+                
+                // Add empty option
+                const emptyOption = document.createElement('option');
+                emptyOption.value = '';
+                emptyOption.textContent = 'Use default voice';
+                webrtcVoiceIdSelect.add(emptyOption);
+                
+                // Add voice options
+                voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.voiceId;
+                    option.textContent = voice.name;
+                    webrtcVoiceIdSelect.add(option);
+                });
+            }
+        }
+
+        // Override loadVoices function to also update WebRTC dropdown
+        const originalLoadVoices = window.loadVoices;
+        window.loadVoices = async function(force = false) {
+            if (originalLoadVoices) {
+                const result = await originalLoadVoices(force);
+                
+                // Get the loaded voices after original function runs
+                if (window.voicesData && window.voicesData.results) {
+                    updateWebRTCVoiceDropdown(window.voicesData.results);
+                }
+                
+                return result;
+            }
+        };
+
+        // Override loadCorpora function to also update WebRTC dropdown
+        const originalLoadCorpora = window.loadCorpora;
+        window.loadCorpora = async function(force = false) {
+            if (originalLoadCorpora) {
+                const result = await originalLoadCorpora(force);
+                
+                // Sync corpus dropdown after original function runs
+                const corpusIdSelect = document.getElementById('corpusId');
+                const webrtcCorpusIdSelect = document.getElementById('webrtc-corpusId');
+                
+                if (corpusIdSelect && webrtcCorpusIdSelect) {
+                    webrtcCorpusIdSelect.innerHTML = corpusIdSelect.innerHTML;
+                }
+                
+                return result;
+            }
+        };
+    </script>
+
+    <!-- Footer -->
+    <div style="text-align: center; margin: 30px 0; color: var(--text-secondary); font-size: 0.9em; width: 100%;">
+        Made by <a href="https://aipowergrid.io" style="color: var(--accent); text-decoration: none;">AI Power Grid</a> 2025
+    </div>
 </body>
 </html> 
