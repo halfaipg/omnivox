@@ -27,11 +27,11 @@
             --text-primary: #ffffff;
             --text-secondary: #b3b3b3;
             --text-labels: #e0e0e0;
-            --accent-color: #4CAF50;
+            --accent-color: #20549a;
             --error-color: #f44336;
-            --accent: #4CAF50;
-            --accent-hover: #3ea043;
-            --success: #00C851;
+            --accent: #20549a;
+            --accent-hover: #1a447d;
+            --success: #20549a;
             --input-bg: rgba(30, 30, 30, 0.9);
             --input-border: rgba(60, 60, 60, 0.8);
             --shadow-subtle: 0 8px 16px rgba(0, 0, 0, 0.4);
@@ -46,10 +46,10 @@
             --text-primary: #121212;
             --text-secondary: #555555;
             --text-labels: #333333;
-            --accent-color: #5c7d99; /* Cool blue-grey tone */
-            --accent: #5c7d99; /* Cool blue-grey tone */
-            --accent-hover: #4e6b84; /* Slightly darker blue-grey for hover */
-            --success: #5c7d99; /* Matching blue-grey for success state */
+            --accent-color: #20549a;
+            --accent: #20549a;
+            --accent-hover: #1a447d;
+            --success: #20549a;
             --input-bg: rgba(240, 240, 240, 0.9);
             --input-border: rgba(200, 200, 200, 0.8);
             --shadow-subtle: 0 8px 16px rgba(0, 0, 0, 0.1);
@@ -116,7 +116,7 @@
         .container {
             background-color: var(--bg-secondary);
             border-radius: 12px;
-            padding: 25px 30px;
+            padding: 20px 30px 25px; /* Reduce top padding */
             margin-bottom: 22px;
             box-shadow: var(--shadow-subtle);
             transition: box-shadow 0.3s ease;
@@ -150,6 +150,7 @@
             letter-spacing: -0.3px;
             font-weight: 600;
             margin-bottom: 20px;
+            margin-top: 0; /* Remove top margin */
             color: var(--text-primary);
             text-align: center;
         }
@@ -1183,7 +1184,7 @@
         .tabs-container {
             width: 100%;
             max-width: 640px;
-            margin-bottom: 15px;
+            margin-bottom: 10px; /* Reduce bottom margin */
         }
 
         .tab-navigation {
@@ -1191,7 +1192,7 @@
             background-color: var(--bg-tertiary);
             border-radius: 10px;
             overflow: hidden;
-            margin-bottom: 20px;
+            margin-bottom: 15px; /* Reduce bottom margin */
             border: 1px solid var(--input-border);
         }
 
@@ -1244,8 +1245,8 @@
         }
 
         .call-button {
-            width: 60px;
-            height: 60px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1258,8 +1259,8 @@
         }
 
         .call-button svg {
-            width: 24px;
-            height: 24px;
+            width: 30px;
+            height: 30px;
             stroke: white;
             fill: none;
             stroke-width: 2;
@@ -1268,7 +1269,11 @@
         }
 
         .call-button.start-call {
-            background-color: var(--accent);
+            background-color: #4CAF50;
+        }
+
+        .call-button.start-call:hover {
+            background-color: #3ea043;
         }
 
         .call-button.end-call {
@@ -1363,6 +1368,130 @@
         /* Import Map for LiveKit Client */
         #livelibsimportmap {
             display: none;
+        }
+
+        /* Call button pulsing animation */
+        @keyframes call-button-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+                transform: scale(1);
+            }
+            70% {
+                box-shadow: 0 0 0 15px rgba(76, 175, 80, 0);
+                transform: scale(1.05);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+                transform: scale(1);
+            }
+        }
+        
+        .call-button.start-call.connecting {
+            animation: call-button-pulse 1.5s infinite;
+        }
+
+        /* Light mode */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #e0e0e0;
+            --hover-color: #f5f5f5;
+            --accent-color: #20549a;
+            --accent-hover: #1a447d;
+            --error-color: #dc3545;
+            --success-color: #28a745;
+            --help-text-color: #666666;
+            --input-bg: #ffffff;
+            --input-border: #e0e0e0;
+            --input-focus-border: #20549a;
+            --input-focus-shadow: rgba(32, 84, 154, 0.2);
+            --button-bg: #20549a;
+            --button-hover: #1a447d;
+            --button-text: #ffffff;
+            --button-disabled: #cccccc;
+            --button-disabled-text: #666666;
+            --tab-active-bg: #20549a;
+            --tab-active-text: #ffffff;
+            --tab-hover-bg: #f5f5f5;
+            --tab-hover-text: #20549a;
+            --result-bg: #f8f9fa;
+            --result-border: #e0e0e0;
+            --result-text: #333333;
+            --transcript-bg: #f8f9fa;
+            --transcript-border: #e0e0e0;
+            --transcript-text: #333333;
+            --transcript-speaker: #20549a;
+            --transcript-agent: #20549a;
+            --transcript-user: #666666;
+            --call-status-bg: #f8f9fa;
+            --call-status-border: #e0e0e0;
+            --call-status-text: #333333;
+            --call-status-connected: #28a745;
+            --call-status-disconnected: #dc3545;
+            --call-status-connecting: #20549a;
+            --call-button-bg: #20549a;
+            --call-button-hover: #1a447d;
+            --call-button-text: #ffffff;
+            --call-button-disabled: #cccccc;
+            --call-button-disabled-text: #666666;
+            --call-button-muted: #dc3545;
+            --call-button-muted-hover: #c82333;
+            --call-button-end: #dc3545;
+            --call-button-end-hover: #c82333;
+            --call-button-pulse: rgba(32, 84, 154, 0.4);
+        }
+
+        /* Dark mode */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1a1a1a;
+                --text-color: #ffffff;
+                --border-color: #333333;
+                --hover-color: #2a2a2a;
+                --accent-color: #20549a;
+                --accent-hover: #1a447d;
+                --error-color: #ff4444;
+                --success-color: #00c851;
+                --help-text-color: #999999;
+                --input-bg: #2a2a2a;
+                --input-border: #333333;
+                --input-focus-border: #20549a;
+                --input-focus-shadow: rgba(32, 84, 154, 0.3);
+                --button-bg: #20549a;
+                --button-hover: #1a447d;
+                --button-text: #ffffff;
+                --button-disabled: #333333;
+                --button-disabled-text: #666666;
+                --tab-active-bg: #20549a;
+                --tab-active-text: #ffffff;
+                --tab-hover-bg: #2a2a2a;
+                --tab-hover-text: #20549a;
+                --result-bg: #2a2a2a;
+                --result-border: #333333;
+                --result-text: #ffffff;
+                --transcript-bg: #2a2a2a;
+                --transcript-border: #333333;
+                --transcript-text: #ffffff;
+                --transcript-speaker: #20549a;
+                --transcript-agent: #20549a;
+                --transcript-user: #999999;
+                --call-status-bg: #2a2a2a;
+                --call-status-border: #333333;
+                --call-status-text: #ffffff;
+                --call-status-connected: #00c851;
+                --call-status-disconnected: #ff4444;
+                --call-status-connecting: #20549a;
+                --call-button-bg: #20549a;
+                --call-button-hover: #1a447d;
+                --call-button-text: #ffffff;
+                --call-button-disabled: #333333;
+                --call-button-disabled-text: #666666;
+                --call-button-muted: #ff4444;
+                --call-button-muted-hover: #cc0000;
+                --call-button-end: #ff4444;
+                --call-button-end-hover: #cc0000;
+                --call-button-pulse: rgba(32, 84, 154, 0.5);
+            }
         }
     </style>
     <script type="importmap" id="livelibsimportmap">
@@ -1477,12 +1606,22 @@
             <div id="call-transcript" class="call-transcript">
                 <p>Transcript will appear here during the call.</p>
             </div>
+            
+            <!-- Move shareable link container here, after the transcript -->
+            <div id="webrtc-shareableLinkContainer" class="mt-20 hidden">
+                <h4>Shareable Link</h4>
+                <div class="link-container">
+                    <input type="text" id="webrtc-shareableLink" readonly>
+                    <button id="webrtc-copyLinkBtn">Copy</button>
+                </div>
+                <small>Share this link to pre-fill the form with these values</small>
+            </div>
         </div>
     </div>
 
     <!-- Phone Call Container (Original Outbound Call Section) -->
     <div id="phone-tab" class="container tab-content">
-        <h2>Make Outbound Call</h2>
+        <h2>Phone Call</h2>
         <form id="outboundForm">
             <div>
                 <label for="phoneNumber">Phone Number</label>
@@ -1705,6 +1844,22 @@ Leave empty to use the above prompt."></textarea>
     </div>
 
     <script>
+        // Create and preload audio elements
+        const ringtone = new Audio('mixkit-marimba-waiting-ringtone-1360.wav');
+        ringtone.preload = 'auto';
+        ringtone.load();
+        ringtone.loop = true;
+        
+        const hangupSound = new Audio('cell-hangup.mp3');
+        hangupSound.preload = 'auto';
+        hangupSound.load();
+        hangupSound.loop = false;
+        
+        const connectSound = new Audio('phone-pick-up-1.mp3');
+        connectSound.preload = 'auto';
+        connectSound.load();
+        connectSound.loop = false;
+
         // Theme switching functionality
         document.addEventListener('DOMContentLoaded', function() {
             const toggleSwitch = document.querySelector('#checkbox');
@@ -1813,6 +1968,12 @@ Leave empty to use the above prompt."></textarea>
                         loadCorpora(true);
                     });
                 }
+                
+                // Set up WebRTC call controls
+                setupWebRTCCallControls();
+                
+                // Set up WebRTC shareable link
+                setupWebRTCShareableLink();
             } catch (error) {
                 console.error("Error during initialization:", error);
             }
@@ -1857,12 +2018,14 @@ Leave empty to use the above prompt."></textarea>
                 navigator.clipboard.writeText(text)
                     .then(() => {
                         // Show feedback
-                        const copyBtn = document.getElementById('copyLinkBtn');
-                        const originalText = copyBtn.textContent;
-                        copyBtn.textContent = 'Copied!';
-                        setTimeout(() => {
-                            copyBtn.textContent = originalText;
-                        }, 2000);
+                        const copyBtn = document.activeElement;
+                        if (copyBtn) {
+                            const originalText = copyBtn.textContent;
+                            copyBtn.textContent = 'Copied!';
+                            setTimeout(() => {
+                                copyBtn.textContent = originalText;
+                            }, 2000);
+                        }
                     })
                     .catch(err => {
                         console.error('Failed to copy: ', err);
@@ -1888,12 +2051,14 @@ Leave empty to use the above prompt."></textarea>
             try {
                 document.execCommand('copy');
                 // Show feedback
-                const copyBtn = document.getElementById('copyLinkBtn');
-                const originalText = copyBtn.textContent;
-                copyBtn.textContent = 'Copied!';
-                setTimeout(() => {
-                    copyBtn.textContent = originalText;
-                }, 2000);
+                const copyBtn = document.activeElement;
+                if (copyBtn) {
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyBtn.textContent = originalText;
+                    }, 2000);
+                }
             } catch (err) {
                 console.error('Fallback: Oops, unable to copy', err);
             }
@@ -1997,6 +2162,8 @@ Leave empty to use the above prompt."></textarea>
                 
                 // Add each corpus as an option
                 if (data.corpora && data.corpora.length > 0) {
+                    let defaultCorpusId = null;
+                    
                     data.corpora.forEach(corpus => {
                         const option = document.createElement('option');
                         option.value = corpus.id || corpus.corpusId; // Support both property names
@@ -2020,10 +2187,17 @@ Leave empty to use the above prompt."></textarea>
                         
                         option.innerHTML = `<span class="corpus-status ${statusClass}"></span> ${corpus.name}`;
                         corpusSelect.add(option);
+                        
+                        // Check if this is the default corpus we want
+                        if (corpus.name === "AI Power Grid Master Docs") {
+                            defaultCorpusId = corpus.id || corpus.corpusId;
+                        }
                     });
                     
-                    // Restore selection if it exists
-                    if (currentSelected) {
+                    // Set the default corpus if found, otherwise restore previous selection
+                    if (defaultCorpusId) {
+                        corpusSelect.value = defaultCorpusId;
+                    } else if (currentSelected) {
                         corpusSelect.value = currentSelected;
                     }
                 } else {
@@ -2912,17 +3086,20 @@ Leave empty to use the above prompt."></textarea>
 
             // Set up WebRTC call controls
             setupWebRTCCallControls();
+            
+            // Set up WebRTC shareable link
+            setupWebRTCShareableLink();
+            
+            // Parse URL parameters to pre-fill forms
+            if (typeof parseURLParams === 'function') {
+                parseURLParams();
+            }
         });
 
         // Global call session
         let callSession = null;
         let callActive = false;
         
-        // Preload and cache the ringtone
-        const ringtone = new Audio('mixkit-marimba-waiting-ringtone-1360.wav');
-        ringtone.preload = 'auto';
-        ringtone.load();
-
         // Function to set up WebRTC call controls
         function setupWebRTCCallControls() {
             const startCallButton = document.getElementById('start-call');
@@ -2942,11 +3119,15 @@ Leave empty to use the above prompt."></textarea>
                     // Disable the start call button immediately
                     startCallButton.disabled = true;
                     
+                    // Add connecting class for pulsing animation
+                    startCallButton.classList.add('connecting');
+                    
                     // Get agent name from form
                     const agentName = document.getElementById('webrtc-agentName').value;
                     
-                    // Update status
-                    callStatus.textContent = 'Connecting to call...';
+                    // Update status with agent name
+                    const agentDisplayName = agentName || 'Loddie';
+                    callStatus.textContent = `Calling ${agentDisplayName}...`;
                     
                     // Start ringtone immediately
                     ringtone.currentTime = 0;
@@ -2962,7 +3143,10 @@ Leave empty to use the above prompt."></textarea>
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            agentName: agentName || 'Loddie'
+                            agentName: agentName || 'Loddie',
+                            voiceId: document.getElementById('webrtc-voiceId').value || undefined,
+                            corpusId: document.getElementById('webrtc-corpusId').value || undefined,
+                            systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined
                         })
                     });
                     
@@ -2994,6 +3178,16 @@ Leave empty to use the above prompt."></textarea>
                             const status = callSession.status;
                             callStatus.textContent = `Call status: ${status}`;
                             
+                            // Play connect sound when call is connected
+                            if (status === 'connected' && ringtone.paused) {
+                                // Stop ringtone if it's still playing
+                                ringtone.pause();
+                                
+                                // Play connect sound
+                                connectSound.currentTime = 0;
+                                connectSound.play().catch(err => console.error('Error playing connect sound:', err));
+                            }
+                            
                             // Handle disconnected state
                             if (status === 'disconnected') {
                                 handleCallEnd();
@@ -3005,35 +3199,54 @@ Leave empty to use the above prompt."></textarea>
                     callSession.addEventListener('transcripts', (event) => {
                         updateTranscript(callSession.transcripts);
                     });
-
-                    // Handle disconnection
-                    callSession.addEventListener('disconnected', () => {
-                        // Update UI
-                        startCallButton.classList.remove('hidden-control');
-                        startCallButton.disabled = false;
-                        muteCallButton.classList.add('hidden-control');
-                        muteCallButton.classList.remove('show-control', 'active');
-                        endCallButton.classList.add('hidden-control');
-                        endCallButton.classList.remove('show-control');
-                        
-                        callStatus.textContent = 'Call ended';
-                        callActive = false;
-                        callSession = null;
-                    });
+                    
+                    // Add a listener for when the room is created
+                    const originalSetStatus = callSession.setStatus;
+                    if (originalSetStatus) {
+                        callSession.setStatus = function(status) {
+                            // Call the original method
+                            originalSetStatus.call(this, status);
+                            
+                            // If we're connecting, set up room event listeners when the room is available
+                            if (status === 'connecting' || status === 'connected') {
+                                // Wait for room to be created
+                                const checkRoom = setInterval(() => {
+                                    if (this.room) {
+                                        clearInterval(checkRoom);
+                                        
+                                        // Listen for room disconnect events
+                                        this.room.on('disconnected', () => {
+                                            console.log('Room disconnected by server or AI');
+                                            handleCallEnd();
+                                        });
+                                        
+                                        // Listen for participant left events (AI agent leaving)
+                                        this.room.on('participantDisconnected', (participant) => {
+                                            console.log('Participant disconnected:', participant);
+                                            handleCallEnd();
+                                        });
+                                    }
+                                }, 100);
+                            }
+                        };
+                    }
                     
                     // Join the call
                     callSession.joinCall(data.joinUrl);
                     
                     // Update UI for active call
                     callActive = true;
+                    startCallButton.classList.remove('connecting'); // Remove connecting class
                     startCallButton.classList.add('hidden-control');
                     muteCallButton.classList.remove('hidden-control');
                     muteCallButton.classList.add('show-control');
                     endCallButton.classList.remove('hidden-control');
                     endCallButton.classList.add('show-control');
                     
-                    // Stop ringtone when call is connected
+                    // Stop ringtone and play connect sound
                     ringtone.pause();
+                    connectSound.currentTime = 0;
+                    connectSound.play().catch(err => console.error('Error playing connect sound:', err));
                     
                     // Clear transcript with agent name
                     const displayName = agentName || 'Loddie';
@@ -3047,8 +3260,9 @@ Leave empty to use the above prompt."></textarea>
                     }
                     callStatus.textContent = `Error: ${error.message}`;
                     callTranscript.innerHTML = `<p>Failed to start call: ${error.message}</p>`;
-                    // Re-enable the start call button on error
+                    // Re-enable the start call button on error and remove connecting class
                     startCallButton.disabled = false;
+                    startCallButton.classList.remove('connecting');
                 }
             });
             
@@ -3067,6 +3281,28 @@ Leave empty to use the above prompt."></textarea>
             
             // Function to handle call end cleanup
             function handleCallEnd() {
+                // Prevent multiple calls to handleCallEnd
+                if (!callActive) return;
+                
+                // Set callActive to false immediately to prevent multiple executions
+                callActive = false;
+                
+                // Play hangup sound with a check to prevent double-playing
+                if (hangupSound && !hangupSound.playing) {
+                    hangupSound.currentTime = 0;
+                    
+                    // Add a flag to track if the sound is playing
+                    hangupSound.playing = true;
+                    
+                    // Play the sound and reset the flag when done
+                    hangupSound.play().catch(err => console.error('Error playing hangup sound:', err));
+                    
+                    // Reset the playing flag when the sound ends
+                    hangupSound.onended = () => {
+                        hangupSound.playing = false;
+                    };
+                }
+                
                 // Update UI
                 startCallButton.classList.remove('hidden-control');
                 startCallButton.disabled = false;
@@ -3076,8 +3312,49 @@ Leave empty to use the above prompt."></textarea>
                 endCallButton.classList.remove('show-control');
                 
                 callStatus.textContent = 'Call ended';
-                callActive = false;
                 callSession = null;
+                
+                // Generate and show shareable link
+                generateWebRTCShareableLink();
+            }
+            
+            // Function to generate WebRTC shareable link
+            function generateWebRTCShareableLink() {
+                const shareableLinkContainer = document.getElementById('webrtc-shareableLinkContainer');
+                const shareableLinkInput = document.getElementById('webrtc-shareableLink');
+                
+                if (!shareableLinkContainer || !shareableLinkInput) return;
+                
+                const baseUrl = window.location.origin + window.location.pathname;
+                let shareableLink = baseUrl + '?';
+                
+                // Get values from form fields
+                const voiceIdSelect = document.getElementById('webrtc-voiceId');
+                const voiceId = voiceIdSelect ? voiceIdSelect.value : '';
+                const agentName = document.getElementById('webrtc-agentName').value;
+                const corpusIdSelect = document.getElementById('webrtc-corpusId');
+                const corpusId = corpusIdSelect ? corpusIdSelect.value : '';
+                const systemPrompt = document.getElementById('webrtc-systemPrompt').value;
+                
+                // Only add parameters that have values
+                if (voiceId) shareableLink += 'voice=' + encodeURIComponent(voiceId) + '&';
+                if (agentName) shareableLink += 'agent=' + encodeURIComponent(agentName) + '&';
+                if (corpusId) shareableLink += 'corpus=' + encodeURIComponent(corpusId) + '&';
+                if (systemPrompt) shareableLink += 'prompt=' + encodeURIComponent(systemPrompt);
+                
+                // Add tab parameter to open the WebRTC tab
+                shareableLink += (shareableLink.endsWith('&') ? '' : '&') + 'tab=webrtc';
+                
+                // Remove trailing '&' if needed
+                if (shareableLink.endsWith('&')) {
+                    shareableLink = shareableLink.slice(0, -1);
+                }
+                
+                // Update the input field
+                shareableLinkInput.value = shareableLink;
+                
+                // Show the container
+                shareableLinkContainer.classList.remove('hidden');
             }
 
             // End call button click handler
@@ -3165,6 +3442,24 @@ Leave empty to use the above prompt."></textarea>
                     webrtcVoiceIdSelect.add(option);
                 });
             }
+            
+            // Check if there's a pending voice selection from URL parameters
+            const pendingVoiceId = webrtcVoiceIdSelect.getAttribute('data-pending-value');
+            if (pendingVoiceId) {
+                console.log('Setting pending voice ID:', pendingVoiceId);
+                
+                // Try to find the option with this value
+                const option = Array.from(webrtcVoiceIdSelect.options).find(opt => opt.value === pendingVoiceId);
+                if (option) {
+                    option.selected = true;
+                    console.log('Successfully set voice ID from URL parameter');
+                } else {
+                    console.warn('Could not find voice option with ID:', pendingVoiceId);
+                }
+                
+                // Clear the pending value
+                webrtcVoiceIdSelect.removeAttribute('data-pending-value');
+            }
         }
 
         // Override loadVoices function to also update WebRTC dropdown
@@ -3194,9 +3489,107 @@ Leave empty to use the above prompt."></textarea>
                 
                 if (corpusIdSelect && webrtcCorpusIdSelect) {
                     webrtcCorpusIdSelect.innerHTML = corpusIdSelect.innerHTML;
+                    webrtcCorpusIdSelect.value = corpusIdSelect.value;
+                    
+                    // Check if there's a pending corpus selection from URL parameters
+                    const pendingCorpusId = webrtcCorpusIdSelect.getAttribute('data-pending-value');
+                    if (pendingCorpusId) {
+                        console.log('Setting pending corpus ID:', pendingCorpusId);
+                        
+                        // Try to find the option with this value
+                        const option = Array.from(webrtcCorpusIdSelect.options).find(opt => opt.value === pendingCorpusId);
+                        if (option) {
+                            option.selected = true;
+                            console.log('Successfully set corpus ID from URL parameter');
+                        } else {
+                            console.warn('Could not find corpus option with ID:', pendingCorpusId);
+                        }
+                        
+                        // Clear the pending value
+                        webrtcCorpusIdSelect.removeAttribute('data-pending-value');
+                    }
                 }
                 
                 return result;
+            }
+        };
+    </script>
+
+    <!-- Function to set up WebRTC shareable link -->
+    <script>
+        function setupWebRTCShareableLink() {
+            const copyLinkBtn = document.getElementById('webrtc-copyLinkBtn');
+            const shareableLinkInput = document.getElementById('webrtc-shareableLink');
+            
+            if (!copyLinkBtn || !shareableLinkInput) {
+                console.error('WebRTC shareable link elements not found');
+                return;
+            }
+            
+            // Copy link button click handler
+            copyLinkBtn.addEventListener('click', function() {
+                if (shareableLinkInput.value) {
+                    copyToClipboard(shareableLinkInput.value);
+                }
+            });
+        }
+
+        // Extend parseURLParams to handle WebRTC form fields
+        const originalParseURLParams = window.parseURLParams;
+        window.parseURLParams = function() {
+            // Call the original function first
+            if (originalParseURLParams) {
+                originalParseURLParams();
+            }
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Map URL parameters to WebRTC form field IDs
+            const webrtcParamMap = {
+                'voice': 'webrtc-voiceId',
+                'corpus': 'webrtc-corpusId',
+                'agent': 'webrtc-agentName',
+                'prompt': 'webrtc-systemPrompt'
+            };
+            
+            // Fill WebRTC form fields based on URL parameters
+            for (const [param, fieldId] of Object.entries(webrtcParamMap)) {
+                if (urlParams.has(param)) {
+                    const field = document.getElementById(fieldId);
+                    if (field) {
+                        if (field.tagName === 'TEXTAREA') {
+                            field.value = decodeURIComponent(urlParams.get(param));
+                        } else if (field.tagName === 'SELECT') {
+                            // For select elements, we need to wait until options are loaded
+                            const paramValue = urlParams.get(param);
+                            
+                            // Try to set the value immediately if options are already loaded
+                            if (field.options.length > 1) {
+                                field.value = paramValue;
+                                
+                                // If the value wasn't set (option doesn't exist yet), save it for later
+                                if (field.value !== paramValue) {
+                                    field.setAttribute('data-pending-value', paramValue);
+                                    console.log(`Saved pending value for ${fieldId}: ${paramValue}`);
+                                }
+                            } else {
+                                // Save the value to set once options are loaded
+                                field.setAttribute('data-pending-value', paramValue);
+                                console.log(`Saved pending value for ${fieldId}: ${paramValue}`);
+                            }
+                        } else {
+                            field.value = decodeURIComponent(urlParams.get(param));
+                        }
+                    }
+                }
+            }
+            
+            // Switch to WebRTC tab if tab parameter is set to webrtc
+            if (urlParams.has('tab') && urlParams.get('tab') === 'webrtc') {
+                const webrtcTabButton = document.querySelector('.tab-button[data-tab="webrtc"]');
+                if (webrtcTabButton) {
+                    webrtcTabButton.click();
+                }
             }
         };
     </script>
