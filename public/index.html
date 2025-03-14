@@ -1306,6 +1306,7 @@
             background-color: var(--bg-tertiary);
             max-height: 300px;
             overflow-y: auto;
+            text-align: center;
         }
 
         .call-transcript p {
@@ -1318,6 +1319,11 @@
 
         .call-transcript .user {
             color: var(--text-primary);
+        }
+
+        .call-transcript .connected-message {
+            color: #4CAF50;
+            font-weight: 500;
         }
 
         .hidden-control {
@@ -2911,6 +2917,11 @@ Leave empty to use the above prompt."></textarea>
         // Global call session
         let callSession = null;
         let callActive = false;
+        
+        // Preload and cache the ringtone
+        const ringtone = new Audio('mixkit-marimba-waiting-ringtone-1360.wav');
+        ringtone.preload = 'auto';
+        ringtone.load();
 
         // Function to set up WebRTC call controls
         function setupWebRTCCallControls() {
@@ -2927,37 +2938,36 @@ Leave empty to use the above prompt."></textarea>
             
             // Start call button click handler
             startCallButton.addEventListener('click', async () => {
-                if (callActive) return;
-                
                 try {
-                    callStatus.textContent = 'Initializing call...';
+                    // Disable the start call button immediately
+                    startCallButton.disabled = true;
                     
-                    // Get call parameters from form
-                    const voiceId = document.getElementById('webrtc-voiceId').value;
-                    const corpusId = document.getElementById('webrtc-corpusId').value;
+                    // Get agent name from form
                     const agentName = document.getElementById('webrtc-agentName').value;
-                    const systemPrompt = document.getElementById('webrtc-systemPrompt').value;
                     
-                    // Create request body
-                    const requestBody = {
-                        voiceId: voiceId || undefined,
-                        corpusId: corpusId || null,
-                        agentName: agentName || undefined,
-                        systemPrompt: systemPrompt || undefined,
-                        medium: 'webRtc'
-                    };
+                    // Update status
+                    callStatus.textContent = 'Connecting to call...';
                     
-                    // Get a join URL from the server
+                    // Start ringtone immediately
+                    ringtone.currentTime = 0;
+                    ringtone.play();
+                    
+                    // Wait 2-5 seconds before starting the connection
+                    await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 3000) + 2000));
+                    
+                    // Get join URL from server
                     const response = await fetch('/webrtc-join-url', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(requestBody)
+                        body: JSON.stringify({
+                            agentName: agentName || 'Loddie'
+                        })
                     });
                     
                     if (!response.ok) {
-                        throw new Error(`Server error: ${response.status}`);
+                        throw new Error('Failed to get join URL');
                     }
                     
                     const data = await response.json();
@@ -2966,12 +2976,11 @@ Leave empty to use the above prompt."></textarea>
                         throw new Error('No join URL provided');
                     }
                     
-                    callStatus.textContent = 'Connecting to call...';
-                    
                     // Create new call session
                     if (!UltravoxSession) {
                         await loadUltravoxSDK();
                         if (!UltravoxSession) {
+                            ringtone.pause(); // Stop ringtone if SDK fails to load
                             throw new Error('Could not load Ultravox SDK');
                         }
                     }
@@ -2981,12 +2990,35 @@ Leave empty to use the above prompt."></textarea>
                     
                     // Set up event listeners for call status changes
                     callSession.addEventListener('status', (event) => {
-                        callStatus.textContent = `Call status: ${callSession.status}`;
+                        if (callSession) {  // Only update status if session still exists
+                            const status = callSession.status;
+                            callStatus.textContent = `Call status: ${status}`;
+                            
+                            // Handle disconnected state
+                            if (status === 'disconnected') {
+                                handleCallEnd();
+                            }
+                        }
                     });
                     
                     // Set up transcript updates
                     callSession.addEventListener('transcripts', (event) => {
                         updateTranscript(callSession.transcripts);
+                    });
+
+                    // Handle disconnection
+                    callSession.addEventListener('disconnected', () => {
+                        // Update UI
+                        startCallButton.classList.remove('hidden-control');
+                        startCallButton.disabled = false;
+                        muteCallButton.classList.add('hidden-control');
+                        muteCallButton.classList.remove('show-control', 'active');
+                        endCallButton.classList.add('hidden-control');
+                        endCallButton.classList.remove('show-control');
+                        
+                        callStatus.textContent = 'Call ended';
+                        callActive = false;
+                        callSession = null;
                     });
                     
                     // Join the call
@@ -3000,13 +3032,23 @@ Leave empty to use the above prompt."></textarea>
                     endCallButton.classList.remove('hidden-control');
                     endCallButton.classList.add('show-control');
                     
-                    // Clear transcript
-                    callTranscript.innerHTML = '<p>Call connected. Start speaking to begin conversation.</p>';
+                    // Stop ringtone when call is connected
+                    ringtone.pause();
+                    
+                    // Clear transcript with agent name
+                    const displayName = agentName || 'Loddie';
+                    callTranscript.innerHTML = `<p class="connected-message">Connected - ${displayName} has joined the call.</p>`;
                     
                 } catch (error) {
                     console.error('Error starting call:', error);
+                    // Stop ringtone when there's an error
+                    if (ringtone) {
+                        ringtone.pause();
+                    }
                     callStatus.textContent = `Error: ${error.message}`;
                     callTranscript.innerHTML = `<p>Failed to start call: ${error.message}</p>`;
+                    // Re-enable the start call button on error
+                    startCallButton.disabled = false;
                 }
             });
             
@@ -3023,32 +3065,40 @@ Leave empty to use the above prompt."></textarea>
                 }
             });
             
+            // Function to handle call end cleanup
+            function handleCallEnd() {
+                // Update UI
+                startCallButton.classList.remove('hidden-control');
+                startCallButton.disabled = false;
+                muteCallButton.classList.add('hidden-control');
+                muteCallButton.classList.remove('show-control', 'active');
+                endCallButton.classList.add('hidden-control');
+                endCallButton.classList.remove('show-control');
+                
+                callStatus.textContent = 'Call ended';
+                callActive = false;
+                callSession = null;
+            }
+
             // End call button click handler
             endCallButton.addEventListener('click', async () => {
                 if (!callSession) return;
                 
                 try {
                     callStatus.textContent = 'Ending call...';
-                    
-                    // Leave the call
                     await callSession.leaveCall();
                     
-                    // Reset state
-                    callSession = null;
-                    callActive = false;
-                    
-                    // Update UI
-                    startCallButton.classList.remove('hidden-control');
-                    muteCallButton.classList.add('hidden-control');
-                    muteCallButton.classList.remove('show-control', 'active');
-                    endCallButton.classList.add('hidden-control');
-                    endCallButton.classList.remove('show-control');
-                    
-                    callStatus.textContent = 'Call ended';
+                    // If status event doesn't trigger, handle cleanup here
+                    setTimeout(() => {
+                        if (callActive) {
+                            handleCallEnd();
+                        }
+                    }, 1000);
                     
                 } catch (error) {
                     console.error('Error ending call:', error);
                     callStatus.textContent = `Error ending call: ${error.message}`;
+                    handleCallEnd();
                 }
             });
         }
@@ -3057,6 +3107,9 @@ Leave empty to use the above prompt."></textarea>
         function updateTranscript(transcripts) {
             const callTranscript = document.getElementById('call-transcript');
             if (!callTranscript) return;
+            
+            // Get agent name from form
+            const agentName = document.getElementById('webrtc-agentName').value || 'Loddie';
             
             // Clear current transcript
             callTranscript.innerHTML = '';
@@ -3068,7 +3121,8 @@ Leave empty to use the above prompt."></textarea>
                 
                 const speakerDiv = document.createElement('div');
                 speakerDiv.className = 'transcript-speaker';
-                speakerDiv.textContent = transcript.speaker === 'AGENT' ? 'AI Assistant' : 'You';
+                // Use agent name for agent role, "You" for user role
+                speakerDiv.textContent = transcript.speaker === 'agent' ? agentName : 'You';
                 
                 const textDiv = document.createElement('div');
                 textDiv.className = 'transcript-text';

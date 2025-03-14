@@ -6,7 +6,7 @@ A powerful integration that connects Ultravox's AI voice capabilities with telep
 
 1. Get your credentials ready:
    - Ultravox API key from [Ultravox Dashboard](https://ultravox.ai)
-   - Either Twilio OR Telnyx credentials (see [Choosing a Provider](#choosing-a-provider))
+   - Twilio credentials (recommended) OR Telnyx credentials (see [Choosing a Provider](#choosing-a-provider))
 
 2. Clone and install:
    ```bash
@@ -31,7 +31,7 @@ A powerful integration that connects Ultravox's AI voice capabilities with telep
 ## Features
 
 - 🎯 **Production Ready**: Enterprise-grade voice AI integration
-- 🔄 **Multi-Provider**: Works with both Twilio and Telnyx (telnyx wip)
+- 🔄 **Multi-Provider**: Works with Twilio (fully supported) and Telnyx (work in progress)
 - 📞 **Full Call Control**: Handle inbound/outbound calls with ease
 - 🧠 **Knowledge Base**: Add custom knowledge to your AI with RAG corpus support
 - 🛠️ **Extensible Tools**: Real-time data access during calls
@@ -41,12 +41,18 @@ A powerful integration that connects Ultravox's AI voice capabilities with telep
 
 ## Choosing a Provider
 
-### Twilio
+### Twilio (Recommended)
 - Easier to get started
 - More beginner-friendly
 - Higher per-minute costs
+- Fully tested and working with all features
 - Get started at [Twilio](https://www.twilio.com/try-twilio)
 
+### Telnyx (Work In Progress)
+- Lower per-minute costs
+- More complex setup
+- **NOTE: Currently audio to the agent is not working properly with Telnyx**
+- Use Twilio for best results until Telnyx integration is completed
 
 ## Prerequisites
 
@@ -70,7 +76,7 @@ cp .env.template .env
 Required variables:
 ```bash
 # Core settings
-VOICE_PROVIDER=twilio  # or telnyx
+VOICE_PROVIDER=twilio  # Recommended! Telnyx integration is WIP
 PORT=3000
 
 # Ultravox settings (Required)

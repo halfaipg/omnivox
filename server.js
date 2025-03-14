@@ -21,15 +21,19 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const DEBUG = false; // Set to false to disable logging
+
 // Debug middleware
 app.use((req, res, next) => {
-    console.log('=== Request Debug ===');
-    console.log('Method:', req.method);
-    console.log('URL:', req.url);
-    console.log('Headers:', req.headers);
-    console.log('Body:', req.body);
-    console.log('Files:', req.files);
-    console.log('===================');
+    if (DEBUG) {
+        console.log('=== Request Debug ===');
+        console.log('Method:', req.method);
+        console.log('URL:', req.url);
+        console.log('Headers:', req.headers);
+        console.log('Body:', req.body);
+        console.log('Files:', req.files);
+        console.log('===================');
+    }
     next();
 });
 
@@ -67,7 +71,7 @@ app.use((req, res, next) => {
 app.use(fileUpload({
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max file size
     abortOnLimit: true,
-    debug: true,
+    debug: false,
     useTempFiles: true,
     tempFileDir: '/tmp/',
     createParentPath: true,
@@ -115,7 +119,7 @@ const AI_TEMPERATURE = parseFloat(process.env.AI_TEMPERATURE) || 0.3;
 const OUTBOUND_FIRST_SPEAKER = process.env.OUTBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_USER';
 const INBOUND_FIRST_SPEAKER = process.env.INBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_AGENT';
 // Use a static preprompt instead of reading from env
-const AGENT_PREPROMPT = "Your name is {AGENT_NAME} and you are using audible speech, so DO NOT vocalize anything that wouldn't be said out loud, such as 'nervous laugh' or 'pauses' etc - instead you can say things like 'i see..' 'hah' or 'okay..''hmmmm' or 'umm' in place of pauses depending on the circumstance and your personality. Please strictly adhere to the following prompt:";
+const AGENT_PREPROMPT = "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets like [nervous laugh], [pauses], [thinking], etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. Please strictly adhere to the following prompt:";
 // Process system prompt by replacing variables
 function processSystemPrompt(prompt, agentName) {
     // Use the provided agent name or fall back to the default AI_NAME
