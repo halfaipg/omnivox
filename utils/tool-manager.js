@@ -4,7 +4,7 @@
  * Provides functions for working with Ultravox tools in the application.
  */
 
-import { tools } from '../config/tools.js';
+import { tools, loadToolsFromEnv } from '../config/tools.js';
 
 /**
  * Get the list of available tools by name
@@ -12,14 +12,17 @@ import { tools } from '../config/tools.js';
  * @returns {Array} - Array of tool configurations in the format Ultravox expects
  */
 function getToolsByName(toolNames = null) {
+  // Get all tools (base + env)
+  const allTools = [...tools, ...loadToolsFromEnv()];
+  
   // If no specific tools requested, return all tools
   if (!toolNames || toolNames.length === 0) {
-    return Object.keys(tools).map(name => ({ toolName: name }));
+    return allTools.map(tool => ({ toolName: tool.name }));
   }
   
   // Otherwise, return only the requested tools
   return toolNames
-    .filter(name => tools[name]) // Only include tools that exist
+    .filter(name => allTools.some(tool => tool.name === name)) // Only include tools that exist
     .map(name => ({ toolName: name }));
 }
 
@@ -30,21 +33,40 @@ function getToolsByName(toolNames = null) {
  * @returns {Array} - Array of temporary tool definitions
  */
 function getTemporaryTools(toolNames = null) {
+  // Get all tools (base + env)
+  const allTools = [...tools, ...loadToolsFromEnv()];
+  
   // Filter tools by name if provided
   const toolsToInclude = toolNames 
-    ? toolNames.filter(name => tools[name])
-    : Object.keys(tools);
+    ? allTools.filter(tool => toolNames.includes(tool.name))
+    : allTools;
   
   // Convert to temporary tool format
-  return toolsToInclude.map(name => {
-    const toolConfig = tools[name];
+  return toolsToInclude.map(toolConfig => {
+    // Create a temporary tool object with only the fields that Ultravox accepts
+    const temporaryTool = {
+      modelToolName: toolConfig.name,
+      description: toolConfig.description,
+      dynamicParameters: toolConfig.params || []
+    };
+
+    // If mockResponse is provided, use client field instead of HTTP
+    if (toolConfig.mockResponse) {
+      temporaryTool.client = {
+        name: "mock",
+        config: {
+          response: JSON.stringify(toolConfig.mockResponse)
+        }
+      };
+    } else {
+      temporaryTool.http = {
+        baseUrlPattern: toolConfig.url,
+        httpMethod: toolConfig.method || 'GET'
+      };
+    }
+
     return {
-      temporaryTool: {
-        modelToolName: toolConfig.name,
-        description: toolConfig.description,
-        dynamicParameters: toolConfig.dynamicParameters || [],
-        http: toolConfig.http
-      }
+      temporaryTool
     };
   });
 }
@@ -60,6 +82,11 @@ function getTemporaryTools(toolNames = null) {
  * @returns {Array} - Array of tool configurations ready to include in a call
  */
 function getToolsForCall(toolNames = null) {
+  // Check if tools should be used at all
+  if (process.env.ULTRAVOX_USE_TOOLS !== 'true') {
+    return [];
+  }
+  
   // Determine whether to use permanent or temporary tools
   const usePermanent = process.env.ULTRAVOX_USE_PERMANENT_TOOLS === 'true';
   

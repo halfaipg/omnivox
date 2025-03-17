@@ -12,6 +12,7 @@ import { WebSocketServer } from 'ws';
 import fileUpload from 'express-fileupload';
 import FormData from 'form-data';
 import fs from 'fs';
+import { getAvailableTimeSlots, groupAvailableSlotsByDay, formatAvailabilityForVoice, createCalendarEvent } from './utils/google-calendar.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -69,19 +70,9 @@ app.use((req, res, next) => {
 
 // Configuration for file upload middleware
 app.use(fileUpload({
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max file size
-    abortOnLimit: true,
-    debug: false,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max file size
     useTempFiles: true,
-    tempFileDir: '/tmp/',
-    createParentPath: true,
-    safeFileNames: true,
-    preserveExtension: true,
-    parseNested: true,
-    uploadTimeout: 60000,
-    // Add more options to capture and debug raw request
-    keepExtensions: true,
-    createParentPath: true
+    tempFileDir: '/tmp/'
 }));
 
 // Serve static files from the public directory
@@ -137,11 +128,35 @@ function processSystemPrompt(prompt, agentName) {
 
 // Get appropriate system prompt based on call type
 function getSystemPrompt(isOutbound = false, agentName = null) {
-    let prompt = isOutbound ? 
-        process.env.OUTBOUND_SYSTEM_PROMPT :
-        process.env.INBOUND_SYSTEM_PROMPT;
+    // Base prompt
+    let prompt = process.env.SYSTEM_PROMPT || '';
     
-    // Add tool information to the prompt if tools are enabled
+    // Add outbound-specific instructions if needed
+    if (isOutbound) {
+        prompt = process.env.OUTBOUND_SYSTEM_PROMPT || prompt;
+    }
+    
+    // Add calendar scheduling capabilities
+    const calendarOwner = process.env.CALENDAR_OWNER ? `for ${process.env.CALENDAR_OWNER}` : '';
+    prompt += `\n\nYou are also a scheduling assistant${calendarOwner}. You can check calendar availability and schedule appointments. 
+When a user asks about scheduling a meeting or call:
+1. ${process.env.CALENDAR_OWNER ? `Explain that you're helping schedule a call with ${process.env.CALENDAR_OWNER}` : 'Ask what the meeting is about'}
+2. Ask them what day or time range they're interested in
+3. Use the calendar tool to check availability
+4. Offer available time slots, grouping by morning, afternoon, or evening
+5. Once they select a time, use the calendar-schedule tool to create the appointment
+6. Confirm the details and let them know the appointment has been scheduled
+7. Be conversational and helpful throughout the process
+
+Remember to use the calendar tool when users ask about scheduling or availability.
+When a user selects a specific time, use the calendar-schedule tool to create the appointment with the following parameters:
+- startTime: The ISO date and time for the start of the appointment (e.g., "2025-03-20T10:00:00-07:00")
+- endTime: The ISO date and time for the end of the appointment (e.g., "2025-03-20T10:30:00-07:00")
+- summary: A brief title for the appointment (e.g., "Call with ${process.env.CALENDAR_OWNER || 'AI Assistant'}")
+- description: Optional details about the appointment
+- attendees: Optional array of email addresses for attendees (e.g., [{"email": "user@example.com"}])`;
+    
+    // Add tool information if tools are enabled
     const toolNames = (process.env.ULTRAVOX_CALL_TOOLS || '').split(',').filter(Boolean);
     const useTools = process.env.ULTRAVOX_USE_TOOLS === 'true' || toolNames.length > 0;
     
@@ -321,8 +336,9 @@ Important: You have access to several tools that enhance your capabilities. Alwa
 2. Format the information naturally in your responses
 3. Don't mention that you're using a tool - just provide the information
 4. If a tool call fails, gracefully inform the user you're unable to get that information right now
-5. For the hangUp tool, only use it when the user requests to end the call or the conversation has reached a natural conclusion
+5. For the hangUp tool, PROACTIVELY use it when the user requests to end the call or the conversation has reached a natural conclusion - don't wait for explicit instructions to use the tool
 6. Before using hangUp, always say "Alrighty, goodbye.." followed by a brief summary or closing statement to the user
+7. IMMEDIATELY use the hangUp tool after saying goodbye, without waiting for further user input
 `;
     }
 
@@ -1704,6 +1720,353 @@ wss.on('connection', (ws, req) => {
         console.error('Error generating webhook event:', error);
     }
 });
+
+// Add a route to serve the system prompt
+app.get('/system-prompt', (req, res) => {
+    const promptType = req.query.type || 'inbound';
+    let prompt;
+    
+    if (promptType === 'inbound') {
+        prompt = process.env.INBOUND_SYSTEM_PROMPT;
+    } else if (promptType === 'outbound') {
+        prompt = process.env.OUTBOUND_SYSTEM_PROMPT;
+    } else {
+        return res.status(400).json({ error: 'Invalid prompt type' });
+    }
+    
+    res.json({ prompt });
+});
+
+// Calendar API proxy endpoints
+app.get('/api/calendar/availability', async (req, res) => {
+  try {
+    console.time('calendar-availability');
+    console.log('Proxying calendar availability request');
+    
+    // Get date range from query params or use default (next 7 days)
+    const startDate = req.query.startDate 
+      ? new Date(req.query.startDate) 
+      : new Date();
+    
+    let endDate = req.query.endDate 
+      ? new Date(req.query.endDate) 
+      : new Date();
+    
+    // If no end date provided, set to 7 days from start
+    if (!req.query.endDate) {
+      endDate.setDate(startDate.getDate() + 7);
+    }
+    
+    // Create a cache key based on the request parameters
+    const cacheKey = `availability_${startDate.toISOString()}_${endDate.toISOString()}`;
+    
+    // Check if we have a cached response
+    if (global.calendarResponseCache && global.calendarResponseCache.has(cacheKey)) {
+      console.log('Using cached calendar response');
+      console.timeEnd('calendar-availability');
+      return res.json(global.calendarResponseCache.get(cacheKey));
+    }
+    
+    console.log(`Checking availability from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    
+    // Get meeting duration from query params or use default (30 minutes)
+    const durationMinutes = parseInt(req.query.duration || 30);
+    
+    // Get available time slots
+    const availableSlots = await getAvailableTimeSlots(startDate, endDate, durationMinutes);
+    console.log(`Found ${availableSlots.length} available time slots`);
+    
+    // Group slots by day and time of day
+    const groupedSlots = groupAvailableSlotsByDay(availableSlots);
+    
+    // Format for voice response
+    const formattedAvailability = formatAvailabilityForVoice(groupedSlots);
+    
+    // Format times in Eastern Time for display
+    const formatTimeInET = (isoString) => {
+      const date = new Date(isoString);
+      
+      // Get hour and minute components
+      const etDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const hour = etDate.getHours() % 12 || 12; // Convert to 12-hour format
+      const minute = etDate.getMinutes();
+      const ampm = etDate.getHours() >= 12 ? 'PM' : 'AM';
+      
+      // Format time in a voice-friendly way
+      let formattedTime;
+      if (minute === 0) {
+        // For times on the hour, use "9AM" format (no space)
+        formattedTime = `${hour}${ampm}`;
+      } else if (minute === 30) {
+        // For half hours, use "9:30AM" format (no space)
+        formattedTime = `${hour}:30${ampm}`;
+      } else {
+        // For other times, use standard format with no space
+        formattedTime = `${hour}:${minute.toString().padStart(2, '0')}${ampm}`;
+      }
+      
+      // Format the date part separately
+      const dateOptions = {
+        timeZone: 'America/New_York',
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      };
+      
+      const datePart = date.toLocaleDateString('en-US', dateOptions);
+      
+      return `${datePart} at ${formattedTime}`;
+    };
+    
+    // Add formatted times to each slot and ensure formattedDate is correct
+    for (const day in formattedAvailability.availableDays) {
+      const dayData = formattedAvailability.availableDays[day];
+      
+      // Fix the formatted date by using the first slot's date
+      if (dayData.slots.morning.length > 0) {
+        const firstSlot = dayData.slots.morning[0];
+        const slotDate = new Date(firstSlot.start);
+        const dateOptions = {
+          timeZone: 'America/New_York',
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric'
+        };
+        dayData.formattedDate = slotDate.toLocaleDateString('en-US', dateOptions);
+      } else if (dayData.slots.afternoon.length > 0) {
+        const firstSlot = dayData.slots.afternoon[0];
+        const slotDate = new Date(firstSlot.start);
+        const dateOptions = {
+          timeZone: 'America/New_York',
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric'
+        };
+        dayData.formattedDate = slotDate.toLocaleDateString('en-US', dateOptions);
+      } else if (dayData.slots.evening.length > 0) {
+        const firstSlot = dayData.slots.evening[0];
+        const slotDate = new Date(firstSlot.start);
+        const dateOptions = {
+          timeZone: 'America/New_York',
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric'
+        };
+        dayData.formattedDate = slotDate.toLocaleDateString('en-US', dateOptions);
+      }
+      
+      // Format times for each slot
+      for (const timeOfDay in dayData.slots) {
+        const slots = dayData.slots[timeOfDay];
+        for (const slot of slots) {
+          slot.formattedStartTime = formatTimeInET(slot.start);
+          slot.formattedEndTime = formatTimeInET(slot.end);
+        }
+      }
+    }
+    
+    // Generate availability text with the corrected formatted dates
+    let availabilityText = "I'm available on ";
+    
+    formattedAvailability.availableDays.forEach((day, index) => {
+      if (index > 0 && index === formattedAvailability.availableDays.length - 1) {
+        availabilityText += " and ";
+      } else if (index > 0) {
+        availabilityText += ", ";
+      }
+      
+      availabilityText += day.formattedDate;
+      
+      if (day.timeOfDayAvailable.length > 0) {
+        availabilityText += " in the ";
+        day.timeOfDayAvailable.forEach((time, timeIndex) => {
+          if (timeIndex > 0 && timeIndex === day.timeOfDayAvailable.length - 1) {
+            availabilityText += " and ";
+          } else if (timeIndex > 0) {
+            availabilityText += ", ";
+          }
+          availabilityText += time;
+        });
+      }
+    });
+    
+    // Set the availability text
+    formattedAvailability.availabilityText = availabilityText;
+    
+    const response = {
+      success: true,
+      availability: formattedAvailability,
+      rawSlots: groupedSlots
+    };
+    
+    // Cache the response
+    if (!global.calendarResponseCache) {
+      global.calendarResponseCache = new Map();
+    }
+    
+    // Store in cache with 5-minute expiration
+    global.calendarResponseCache.set(cacheKey, response);
+    setTimeout(() => {
+      if (global.calendarResponseCache && global.calendarResponseCache.has(cacheKey)) {
+        global.calendarResponseCache.delete(cacheKey);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    console.timeEnd('calendar-availability');
+    res.json(response);
+  } catch (error) {
+    console.error('Error getting calendar availability:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.post('/api/calendar/schedule', async (req, res) => {
+  try {
+    console.log('Proxying calendar scheduling request');
+    
+    // Get required parameters from request body
+    let { startTime, endTime, summary, description, attendees } = req.body;
+    
+    // Validate required parameters
+    if (!startTime || !endTime) {
+      return res.status(400).json({
+        success: false,
+        error: 'Start time and end time are required'
+      });
+    }
+    
+    // Check if the time is specified in Eastern Time
+    if (typeof summary === 'string') {
+      // First check for formats like "at 2PM", "at 2 PM", "at 2:30PM", "at 2:30 PM"
+      // This regex specifically looks for "at" followed by a time
+      let timeMatch = summary.match(/at\s+(\d+)(?::(\d+))?\s*([AP]M)/i);
+      
+      // If not found, check for direct time formats like "2PM", "2 PM", "2:30PM", "2:30 PM"
+      if (!timeMatch) {
+        // This will match the first occurrence of a time pattern
+        timeMatch = summary.match(/\b(\d+)(?::(\d+))?\s*([AP]M)\b/i);
+      }
+      
+      if (timeMatch) {
+        console.log('Detected time in summary:', timeMatch[0]);
+        const hour = parseInt(timeMatch[1]);
+        const minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+        const isPM = timeMatch[3].toUpperCase() === 'PM';
+        
+        // Convert to 24-hour format
+        let hour24 = hour;
+        if (isPM && hour < 12) hour24 += 12;
+        if (!isPM && hour === 12) hour24 = 0;
+        
+        // Extract the date from the original startTime
+        const originalDate = new Date(startTime);
+        const year = originalDate.getUTCFullYear();
+        const month = originalDate.getUTCMonth();
+        const day = originalDate.getUTCDate();
+        
+        // Create a new Date object in Eastern Time
+        // First create the date in local time
+        const etDate = new Date(year, month, day, hour24, minute, 0);
+        
+        // Then convert it to an ISO string with Eastern Time zone offset
+        // Use -04:00 for EDT (summer) or -05:00 for EST (winter)
+        // For simplicity, we'll use -04:00 since we're dealing with future dates in 2025
+        const etDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00-04:00`;
+        
+        // Calculate end time (30 minutes later)
+        const etEndDate = new Date(etDate);
+        etEndDate.setMinutes(etEndDate.getMinutes() + 30);
+        const etEndDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(etEndDate.getHours()).padStart(2, '0')}:${String(etEndDate.getMinutes()).padStart(2, '0')}:00-04:00`;
+        
+        // Update the start and end times
+        startTime = etDateString;
+        endTime = etEndDateString;
+        
+        console.log(`Adjusted time to match specified time: ${startTime} to ${endTime}`);
+      }
+    }
+    
+    console.log(`Scheduling event from ${startTime} to ${endTime}`);
+    
+    // Create calendar event
+    const event = await createCalendarEvent({
+      startTime,
+      endTime,
+      summary: summary || 'Scheduled Meeting',
+      description: description || '',
+      attendees: attendees || []
+    });
+    
+    // Format times in Eastern Time for display
+    const formatTimeInET = (isoString) => {
+      const date = new Date(isoString);
+      
+      // Get hour and minute components
+      const etDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const hour = etDate.getHours() % 12 || 12; // Convert to 12-hour format
+      const minute = etDate.getMinutes();
+      const ampm = etDate.getHours() >= 12 ? 'PM' : 'AM';
+      
+      // Format time in a voice-friendly way
+      let formattedTime;
+      if (minute === 0) {
+        // For times on the hour, use "9AM" format (no space)
+        formattedTime = `${hour}${ampm}`;
+      } else if (minute === 30) {
+        // For half hours, use "9:30AM" format (no space)
+        formattedTime = `${hour}:30${ampm}`;
+      } else {
+        // For other times, use standard format with no space
+        formattedTime = `${hour}:${minute.toString().padStart(2, '0')}${ampm}`;
+      }
+      
+      // Format the date part separately
+      const dateOptions = {
+        timeZone: 'America/New_York',
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      };
+      
+      const datePart = date.toLocaleDateString('en-US', dateOptions);
+      
+      return `${datePart} at ${formattedTime}`;
+    };
+    
+    // Add formatted times to the response
+    const formattedEvent = {
+      ...event,
+      formattedStart: formatTimeInET(event.start.dateTime),
+      formattedEnd: formatTimeInET(event.end.dateTime)
+    };
+    
+    res.json({
+      success: true,
+      event: formattedEvent
+    });
+  } catch (error) {
+    console.error('Error scheduling calendar event:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Calendar context for Ultravox
+function getCalendarContext(startDate = new Date(), days = 7) {
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + days);
+  
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+    durationMinutes: 30
+  };
+}
 
 // Start server
 server.listen(PORT, async () => {
