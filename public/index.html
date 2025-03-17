@@ -1602,6 +1602,11 @@
                 <small class="help-text">The name agent will introduce itself as</small>
             </div>
             <div>
+                <label for="webrtc-userEmail">Your Email (optional)</label>
+                <input type="email" id="webrtc-userEmail" name="webrtc-userEmail" placeholder="For calendar scheduling">
+                <small class="help-text">Used for calendar scheduling if you want to receive invites</small>
+            </div>
+            <div>
                 <label for="webrtc-systemPrompt">System Prompt</label>
                 <textarea id="webrtc-systemPrompt" name="webrtc-systemPrompt" rows="6" placeholder="Loading default system prompt..."></textarea>
                 <small class="help-text">Optional: Customize the AI's behavior with a specific prompt</small>
@@ -3059,6 +3064,35 @@
             }
         }
 
+        // Function to determine time of day based on hour
+        function getTimeOfDay(hour) {
+            console.log(`Current hour: ${hour}, determining time of day...`);
+            if (hour >= 5 && hour < 12) {
+                console.log(`Time of day: morning (${hour})`);
+                return "morning";
+            }
+            if (hour >= 12 && hour < 17) {
+                console.log(`Time of day: afternoon (${hour})`);
+                return "afternoon";
+            }
+            if (hour >= 17 && hour < 22) {
+                console.log(`Time of day: evening (${hour})`);
+                return "evening";
+            }
+            console.log(`Time of day: night (${hour})`);
+            return "night";
+        }
+
+        // Function to format time in 12-hour format with AM/PM
+        function formatTime(date) {
+            let hours = date.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes} ${ampm}`;
+        }
+
         // Load system prompt from server
         async function loadSystemPrompt(promptType = 'inbound', elementId = 'webrtc-systemPrompt') {
             try {
@@ -3188,6 +3222,22 @@
                     // Wait 2-5 seconds before starting the connection
                     await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 3000) + 2000));
                     
+                    // Debug time information
+                    const now = new Date();
+                    const localTimeString = now.toLocaleString();
+                    const hour = now.getHours();
+                    const minute = now.getMinutes();
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    const hour12 = hour % 12 || 12;
+                    const exactTimeString = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                    
+                    console.log('Time debug info:', {
+                        localTime: localTimeString,
+                        exactTime: exactTimeString,
+                        hour24: hour,
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    });
+                    
                     // Get join URL from server
                     const response = await fetch('/webrtc-join-url', {
                         method: 'POST',
@@ -3198,7 +3248,12 @@
                             agentName: agentName || 'Loddie',
                             voiceId: document.getElementById('webrtc-voiceId').value || undefined,
                             corpusId: document.getElementById('webrtc-corpusId').value || undefined,
-                            systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined
+                            // Add time directly to system prompt
+                            systemPrompt: `CRITICAL INSTRUCTION: The current time is EXACTLY ${exactTimeString}. You MUST begin your conversation by saying "Good ${hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening')}! It's ${exactTimeString} right now."\n\n${document.getElementById('webrtc-systemPrompt').value || ''}`,
+                            userEmail: document.getElementById('webrtc-userEmail').value || undefined,
+                            // Simplified time information
+                            userLocalTimeString: localTimeString,
+                            userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                         })
                     });
                     

@@ -268,3 +268,89 @@ For detailed API documentation, see our [API Guide](docs/API.md).
 
 - [Ultravox](https://ultravox.ai) for voice AI technology
 - [Twilio](https://twilio.com) and [Telnyx](https://telnyx.com) for telephony services
+
+## Calendar Integration
+
+This integration supports both Google Calendar and Microsoft Calendar for scheduling appointments and checking availability.
+
+### Google Calendar Setup (Default)
+
+1. Set up Google Calendar API credentials:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project
+   - Enable the Google Calendar API
+   - Create OAuth 2.0 credentials
+   - Download the credentials JSON file
+
+2. Add the following to your `.env` file:
+   ```
+   GOOGLE_CLIENT_ID=your_client_id
+   GOOGLE_CLIENT_SECRET=your_client_secret
+   GOOGLE_REFRESH_TOKEN=your_refresh_token
+   DEFAULT_CALENDAR_PROVIDER=google
+   ```
+
+### Microsoft Calendar Setup
+
+1. Set up Microsoft Graph API credentials:
+   - Go to [Azure Portal](https://portal.azure.com/)
+   - Register a new application
+   - Add Microsoft Graph API permissions (Calendars.ReadWrite)
+   - Create a client secret
+
+2. Add the following to your `.env` file:
+   ```
+   MS_CLIENT_ID=your_microsoft_client_id
+   MS_CLIENT_SECRET=your_microsoft_client_secret
+   MS_USER_EMAIL=your_microsoft_email@example.com
+   DEFAULT_CALENDAR_PROVIDER=microsoft  # Change to 'microsoft' to use Microsoft Calendar by default
+   ```
+
+### Using Calendar APIs
+
+#### Check Availability
+
+```bash
+# Google Calendar (default)
+curl http://localhost:3000/api/calendar/availability
+
+# Microsoft Calendar
+curl http://localhost:3000/api/calendar/availability?provider=microsoft
+
+# With date range
+curl http://localhost:3000/api/calendar/availability?startDate=2025-03-18&endDate=2025-03-25
+```
+
+#### Schedule Meeting
+
+```bash
+# Google Calendar (default)
+curl -X POST http://localhost:3000/api/calendar/schedule \
+  -H "Content-Type: application/json" \
+  -d '{
+    "startTime": "2025-03-18T14:00:00.000Z",
+    "endTime": "2025-03-18T14:30:00.000Z",
+    "summary": "Meeting at 2PM",
+    "description": "Discussion about project",
+    "attendees": [{"email": "attendee@example.com"}]
+  }'
+
+# Microsoft Calendar
+curl -X POST http://localhost:3000/api/calendar/schedule?provider=microsoft \
+  -H "Content-Type: application/json" \
+  -d '{
+    "startTime": "2025-03-18T14:00:00.000Z",
+    "endTime": "2025-03-18T14:30:00.000Z",
+    "summary": "Meeting at 2PM",
+    "description": "Discussion about project",
+    "attendees": [{"email": "attendee@example.com"}]
+  }'
+```
+
+### Testing Calendar Integration
+
+To test the Microsoft Calendar integration:
+
+```bash
+node test-ms-calendar.js
+```

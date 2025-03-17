@@ -6,6 +6,10 @@
  */
 
 import 'dotenv/config';
+import dotenv from 'dotenv';
+
+// Load tools-specific environment variables
+dotenv.config({ path: '.env.tools' });
 
 // Base tools array
 const tools = [

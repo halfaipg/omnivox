@@ -12,7 +12,21 @@ import { WebSocketServer } from 'ws';
 import fileUpload from 'express-fileupload';
 import FormData from 'form-data';
 import fs from 'fs';
-import { getAvailableTimeSlots, groupAvailableSlotsByDay, formatAvailabilityForVoice, createCalendarEvent } from './utils/google-calendar.js';
+import { 
+  getAvailableTimeSlots as getGoogleAvailableTimeSlots, 
+  groupAvailableSlotsByDay, 
+  formatAvailabilityForVoice, 
+  createCalendarEvent as createGoogleCalendarEvent 
+} from './utils/google-calendar.js';
+import {
+  getAvailableTimeSlots as getMicrosoftAvailableTimeSlots,
+  createCalendarEvent as createMicrosoftCalendarEvent
+} from './utils/microsoft-calendar.js';
+
+// Load additional environment files
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.calendar' });
+dotenv.config({ path: '.env.tools' });
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -110,7 +124,7 @@ const AI_TEMPERATURE = parseFloat(process.env.AI_TEMPERATURE) || 0.3;
 const OUTBOUND_FIRST_SPEAKER = process.env.OUTBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_USER';
 const INBOUND_FIRST_SPEAKER = process.env.INBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_AGENT';
 // Use a static preprompt instead of reading from env
-const AGENT_PREPROMPT = "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets like [nervous laugh], [pauses], [thinking], etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. Please strictly adhere to the following prompt:";
+const AGENT_PREPROMPT = "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets like [nervous laugh], [pauses], [thinking], etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. CRITICAL: You MUST begin your conversation by acknowledging the user's EXACT current local time that is provided to you with an appropriate greeting (e.g., 'Good morning! It's 11:45 AM where you are.'). Please strictly adhere to the following prompt:";
 // Process system prompt by replacing variables
 function processSystemPrompt(prompt, agentName) {
     // Use the provided agent name or fall back to the default AI_NAME
@@ -127,13 +141,19 @@ function processSystemPrompt(prompt, agentName) {
 }
 
 // Get appropriate system prompt based on call type
-function getSystemPrompt(isOutbound = false, agentName = null) {
+function getSystemPrompt(isOutbound = false, agentName = null, userEmail = null, userLocalTimeString = null, userTimeZone = null) {
     // Base prompt
     let prompt = process.env.SYSTEM_PROMPT || '';
     
     // Add outbound-specific instructions if needed
     if (isOutbound) {
         prompt = process.env.OUTBOUND_SYSTEM_PROMPT || prompt;
+    }
+    
+    // Add user's local time information if available
+    if (userLocalTimeString && userTimeZone) {
+        // Make time information extremely prominent at the beginning of the prompt
+        prompt = `CRITICAL INSTRUCTION: The user's current local time is "${userLocalTimeString}" in the ${userTimeZone} timezone. You MUST acknowledge this exact time in your very first sentence with an appropriate greeting (Good morning/afternoon/evening).\n\n${prompt}`;
     }
     
     // Add calendar scheduling capabilities
@@ -151,10 +171,17 @@ When a user asks about scheduling a meeting or call:
 Remember to use the calendar tool when users ask about scheduling or availability.
 When a user selects a specific time, use the calendar-schedule tool to create the appointment with the following parameters:
 - startTime: The ISO date and time for the start of the appointment (e.g., "2025-03-20T10:00:00-07:00")
-- endTime: The ISO date and time for the end of the appointment (e.g., "2025-03-20T10:30:00-07:00")
+- endTime: The ISO date and time for the end of the appointment (exactly 30 minutes after startTime)
 - summary: A brief title for the appointment (e.g., "Call with ${process.env.CALENDAR_OWNER || 'AI Assistant'}")
 - description: Optional details about the appointment
-- attendees: Optional array of email addresses for attendees (e.g., [{"email": "user@example.com"}])`;
+- attendees: Array of email addresses for attendees`;
+
+    // Add user email to attendees if provided
+    if (userEmail) {
+        prompt += `\n\nThe user's email address is "${userEmail}". Always include this email in the attendees array when scheduling appointments using the calendar-schedule tool. Example: [{"email": "${userEmail}"}]`;
+    } else {
+        prompt += `\n\nIf the user provides their email address during the conversation, include it in the attendees array when scheduling. Example: [{"email": "user@example.com"}]`;
+    }
     
     // Add tool information if tools are enabled
     const toolNames = (process.env.ULTRAVOX_CALL_TOOLS || '').split(',').filter(Boolean);
@@ -253,14 +280,36 @@ async function createUltravoxCall(options = {}) {
         corpusId: overrideCorpusId,
         toolNames,
         agentName,
+        userEmail,
+        userLocalTimeString,
+        userTimeZone,
         medium
     } = options;
 
+    // Get current time for the system prompt
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    const exactTimeString = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+    const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+    const timezone = userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Eastern Time';
+    
+    // Add time directly to the beginning of the system prompt
+    let finalSystemPrompt = systemPrompt;
+    if (!finalSystemPrompt) {
+        finalSystemPrompt = getSystemPrompt(isOutbound, agentName, userEmail, userLocalTimeString, userTimeZone);
+    }
+    
+    // Add the exact time instruction at the very beginning of the prompt
+    finalSystemPrompt = `CRITICAL INSTRUCTION: The current time is EXACTLY ${exactTimeString} in ${timezone}. You MUST begin your conversation by saying "Good ${timeOfDay}! It's ${exactTimeString} in ${timezone} right now."\n\n${finalSystemPrompt}`;
+    
+    console.log('Using system prompt with time:', exactTimeString, 'in timezone:', timezone);
+
     // Create base call config
     const callConfig = {
-        systemPrompt: systemPrompt ? 
-            processSystemPrompt(systemPrompt, agentName) : 
-            getSystemPrompt(isOutbound, agentName),
+        systemPrompt: processSystemPrompt(finalSystemPrompt, agentName),
         model: 'fixie-ai/ultravox-70B',  // Ensure we use 70B model which handles tools better
         voice: voiceId || AI_VOICE,
         temperature: AI_TEMPERATURE,
@@ -1494,22 +1543,31 @@ app.post('/webrtc-join-url', async (req, res) => {
             voiceId, 
             corpusId, 
             agentName, 
-            systemPrompt 
+            systemPrompt,
+            userEmail,
+            userLocalTimeString,
+            userTimeZone
         } = req.body;
         
         console.log('Received WebRTC join URL request:', {
             voiceId,
             corpusId,
             agentName,
-            systemPrompt: systemPrompt ? 'provided' : 'not provided'
+            systemPrompt: systemPrompt ? 'provided' : 'not provided',
+            userEmail: userEmail ? 'provided' : 'not provided',
+            userLocalTimeString: userLocalTimeString || 'not provided',
+            userTimeZone: userTimeZone || 'not provided'
         });
         
         // Create Ultravox call with WebRTC medium
         const response = await createUltravoxCall({
-            systemPrompt,
+            systemPrompt: systemPrompt || process.env.INBOUND_SYSTEM_PROMPT,
             voiceId,
             corpusId,
             agentName,
+            userEmail,
+            userLocalTimeString,
+            userTimeZone,
             // Specific options for WebRTC
             medium: { "webRtc": {} }
         });
@@ -1758,7 +1816,8 @@ app.get('/api/calendar/availability', async (req, res) => {
     }
     
     // Create a cache key based on the request parameters
-    const cacheKey = `availability_${startDate.toISOString()}_${endDate.toISOString()}`;
+    const calendarProvider = req.query.provider || process.env.DEFAULT_CALENDAR_PROVIDER || 'google';
+    const cacheKey = `availability_${calendarProvider}_${startDate.toISOString()}_${endDate.toISOString()}`;
     
     // Check if we have a cached response
     if (global.calendarResponseCache && global.calendarResponseCache.has(cacheKey)) {
@@ -1767,13 +1826,20 @@ app.get('/api/calendar/availability', async (req, res) => {
       return res.json(global.calendarResponseCache.get(cacheKey));
     }
     
-    console.log(`Checking availability from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    console.log(`Checking availability from ${startDate.toISOString()} to ${endDate.toISOString()} using ${calendarProvider}`);
     
     // Get meeting duration from query params or use default (30 minutes)
     const durationMinutes = parseInt(req.query.duration || 30);
     
-    // Get available time slots
-    const availableSlots = await getAvailableTimeSlots(startDate, endDate, durationMinutes);
+    // Get available time slots based on the provider
+    let availableSlots;
+    if (calendarProvider.toLowerCase() === 'microsoft') {
+      availableSlots = await getMicrosoftAvailableTimeSlots(startDate, endDate, durationMinutes);
+    } else {
+      // Default to Google Calendar
+      availableSlots = await getGoogleAvailableTimeSlots(startDate, endDate, durationMinutes);
+    }
+    
     console.log(`Found ${availableSlots.length} available time slots`);
     
     // Group slots by day and time of day
@@ -1868,52 +1934,88 @@ app.get('/api/calendar/availability', async (req, res) => {
     // Generate availability text with the corrected formatted dates
     let availabilityText = "I'm available on ";
     
-    formattedAvailability.availableDays.forEach((day, index) => {
-      if (index > 0 && index === formattedAvailability.availableDays.length - 1) {
-        availabilityText += " and ";
-      } else if (index > 0) {
-        availabilityText += ", ";
-      }
-      
-      availabilityText += day.formattedDate;
-      
-      if (day.timeOfDayAvailable.length > 0) {
-        availabilityText += " in the ";
-        day.timeOfDayAvailable.forEach((time, timeIndex) => {
-          if (timeIndex > 0 && timeIndex === day.timeOfDayAvailable.length - 1) {
-            availabilityText += " and ";
-          } else if (timeIndex > 0) {
-            availabilityText += ", ";
-          }
-          availabilityText += time;
-        });
-      }
-    });
+    // Get the available days
+    const availableDays = formattedAvailability.availableDays;
+    const dayKeys = Object.keys(availableDays);
     
-    // Set the availability text
+    if (dayKeys.length === 0) {
+      availabilityText = "I don't have any availability in the requested time range.";
+    } else if (dayKeys.length === 1) {
+      // Only one day available
+      const day = availableDays[dayKeys[0]];
+      availabilityText += `${day.formattedDate} in the `;
+      
+      // Add time of day
+      const timeOfDay = day.timeOfDayAvailable;
+      if (timeOfDay.length === 1) {
+        availabilityText += `${timeOfDay[0]}`;
+      } else if (timeOfDay.length === 2) {
+        availabilityText += `${timeOfDay[0]} and ${timeOfDay[1]}`;
+      } else if (timeOfDay.length === 3) {
+        availabilityText += `${timeOfDay[0]}, ${timeOfDay[1]}, and ${timeOfDay[2]}`;
+      }
+      
+      // Add specific times
+      availabilityText += ". Specifically, I'm free at ";
+      
+      // Collect all times from this day
+      const allTimes = [];
+      for (const tod of timeOfDay) {
+        const slots = day.slots[tod];
+        for (const slot of slots) {
+          // Extract just the time part from the formatted time
+          const timePart = slot.formattedStartTime.split(' at ')[1];
+          allTimes.push(timePart);
+        }
+      }
+      
+      // Format the times
+      if (allTimes.length === 1) {
+        availabilityText += allTimes[0];
+      } else if (allTimes.length === 2) {
+        availabilityText += `${allTimes[0]} and ${allTimes[1]}`;
+      } else {
+        const lastTime = allTimes.pop();
+        availabilityText += `${allTimes.join(', ')}, and ${lastTime}`;
+      }
+    } else {
+      // Multiple days available
+      const formattedDays = dayKeys.map((key, index) => {
+        const day = availableDays[key];
+        let dayText = day.formattedDate;
+        
+        // Add time of day
+        const timeOfDay = day.timeOfDayAvailable;
+        if (timeOfDay.length === 1) {
+          dayText += ` in the ${timeOfDay[0]}`;
+        } else if (timeOfDay.length === 2) {
+          dayText += ` in the ${timeOfDay[0]} and ${timeOfDay[1]}`;
+        } else if (timeOfDay.length === 3) {
+          dayText += ` in the ${timeOfDay[0]}, ${timeOfDay[1]}, and ${timeOfDay[2]}`;
+        }
+        
+        return dayText;
+      });
+      
+      if (formattedDays.length === 2) {
+        availabilityText += `${formattedDays[0]} and ${formattedDays[1]}`;
+      } else {
+        const lastDay = formattedDays.pop();
+        availabilityText += `${formattedDays.join(', ')}, and ${lastDay}`;
+      }
+    }
+    
+    // Update the availability text
     formattedAvailability.availabilityText = availabilityText;
-    
-    const response = {
-      success: true,
-      availability: formattedAvailability,
-      rawSlots: groupedSlots
-    };
     
     // Cache the response
     if (!global.calendarResponseCache) {
       global.calendarResponseCache = new Map();
     }
-    
-    // Store in cache with 5-minute expiration
-    global.calendarResponseCache.set(cacheKey, response);
-    setTimeout(() => {
-      if (global.calendarResponseCache && global.calendarResponseCache.has(cacheKey)) {
-        global.calendarResponseCache.delete(cacheKey);
-      }
-    }, 5 * 60 * 1000); // 5 minutes
+    global.calendarResponseCache.set(cacheKey, formattedAvailability);
     
     console.timeEnd('calendar-availability');
-    res.json(response);
+    res.json(formattedAvailability);
   } catch (error) {
     console.error('Error getting calendar availability:', error);
     res.status(500).json({
@@ -1929,6 +2031,9 @@ app.post('/api/calendar/schedule', async (req, res) => {
     
     // Get required parameters from request body
     let { startTime, endTime, summary, description, attendees } = req.body;
+    
+    // Get calendar provider from query params or use default
+    const calendarProvider = req.query.provider || process.env.DEFAULT_CALENDAR_PROVIDER || 'google';
     
     // Validate required parameters
     if (!startTime || !endTime) {
@@ -1976,7 +2081,7 @@ app.post('/api/calendar/schedule', async (req, res) => {
         // For simplicity, we'll use -04:00 since we're dealing with future dates in 2025
         const etDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00-04:00`;
         
-        // Calculate end time (30 minutes later)
+        // Calculate end time (always 30 minutes later)
         const etEndDate = new Date(etDate);
         etEndDate.setMinutes(etEndDate.getMinutes() + 30);
         const etEndDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(etEndDate.getHours()).padStart(2, '0')}:${String(etEndDate.getMinutes()).padStart(2, '0')}:00-04:00`;
@@ -1987,18 +2092,89 @@ app.post('/api/calendar/schedule', async (req, res) => {
         
         console.log(`Adjusted time to match specified time: ${startTime} to ${endTime}`);
       }
+    } else {
+      // If no time is specified in the summary, ensure we're using Eastern Time
+      // This handles the case where the time is passed directly in startTime/endTime
+      try {
+        // Parse the startTime
+        const startDate = new Date(startTime);
+        
+        // Create a formatter that will output the time in Eastern Time
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        // Format the date in Eastern Time
+        const etParts = formatter.formatToParts(startDate);
+        const etValues = {};
+        etParts.forEach(part => {
+          etValues[part.type] = part.value;
+        });
+        
+        // Extract the components
+        const etYear = parseInt(etValues.year);
+        const etMonth = parseInt(etValues.month) - 1; // Month is 0-based
+        const etDay = parseInt(etValues.day);
+        const etHour = parseInt(etValues.hour);
+        const etMinute = parseInt(etValues.minute);
+        
+        // Create a new Date object with these components
+        const etDate = new Date(etYear, etMonth, etDay, etHour, etMinute, 0);
+        
+        // Format as ISO string with Eastern Time offset
+        const etDateString = `${etYear}-${String(etMonth + 1).padStart(2, '0')}-${String(etDay).padStart(2, '0')}T${String(etHour).padStart(2, '0')}:${String(etMinute).padStart(2, '0')}:00-04:00`;
+        
+        // Calculate end time (30 minutes later)
+        const etEndDate = new Date(etDate);
+        etEndDate.setMinutes(etEndDate.getMinutes() + 30);
+        const etEndDateString = `${etYear}-${String(etMonth + 1).padStart(2, '0')}-${String(etDay).padStart(2, '0')}T${String(etEndDate.getHours()).padStart(2, '0')}:${String(etEndDate.getMinutes()).padStart(2, '0')}:00-04:00`;
+        
+        // Update the start and end times
+        startTime = etDateString;
+        endTime = etEndDateString;
+        
+        console.log(`Converted time to Eastern Time: ${startTime} to ${endTime}`);
+      } catch (error) {
+        console.error('Error converting time to Eastern Time:', error);
+        // Continue with the original times if there's an error
+      }
     }
     
-    console.log(`Scheduling event from ${startTime} to ${endTime}`);
+    // Ensure the meeting is exactly 30 minutes long
+    const startDate = new Date(startTime);
+    const endDate = new Date(startTime);
+    endDate.setMinutes(endDate.getMinutes() + 30);
+    endTime = endDate.toISOString();
     
-    // Create calendar event
-    const event = await createCalendarEvent({
-      startTime,
-      endTime,
-      summary: summary || 'Scheduled Meeting',
-      description: description || '',
-      attendees: attendees || []
-    });
+    console.log(`Scheduling event from ${startTime} to ${endTime} using ${calendarProvider}`);
+    
+    // Create calendar event based on the provider
+    let event;
+    if (calendarProvider.toLowerCase() === 'microsoft') {
+      event = await createMicrosoftCalendarEvent({
+        startTime,
+        endTime,
+        summary: summary || 'Scheduled Meeting',
+        description: description || '',
+        attendees: attendees || []
+      });
+    } else {
+      // Default to Google Calendar
+      event = await createGoogleCalendarEvent({
+        startTime,
+        endTime,
+        summary: summary || 'Scheduled Meeting',
+        description: description || '',
+        attendees: attendees || []
+      });
+    }
     
     // Format times in Eastern Time for display
     const formatTimeInET = (isoString) => {
@@ -2175,4 +2351,56 @@ server.listen(PORT, async () => {
         console.log('\n--- Configuration Warnings ---');
         configWarnings.forEach(warning => console.warn(warning));
     }
+});
+
+// Microsoft OAuth2 endpoints
+app.get('/auth/microsoft', (req, res) => {
+  const clientId = process.env.MS_CLIENT_ID;
+  const redirectUri = `${process.env.BASE_URL}/oauth2callback-microsoft`;
+  const scope = 'offline_access Calendars.ReadWrite';
+  
+  const authUrl = `https://login.microsoftonline.com/aipowergrid.io/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_mode=query`;
+  
+  res.redirect(authUrl);
+});
+
+app.get('/oauth2callback-microsoft', async (req, res) => {
+  const code = req.query.code;
+  
+  if (!code) {
+    return res.status(400).send('Authorization code not received');
+  }
+  
+  try {
+    const tokenResponse = await fetch('https://login.microsoftonline.com/aipowergrid.io/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: process.env.MS_CLIENT_ID,
+        client_secret: process.env.MS_CLIENT_SECRET,
+        code: code,
+        redirect_uri: `${process.env.BASE_URL}/oauth2callback-microsoft`,
+        grant_type: 'authorization_code',
+      }),
+    });
+    
+    const tokenData = await tokenResponse.json();
+    
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to get token: ${tokenData.error_description || tokenData.error}`);
+    }
+    
+    // Display the refresh token to the user
+    res.send(`
+      <h1>Microsoft Authentication Successful</h1>
+      <p>Add this refresh token to your .env file:</p>
+      <pre>MS_REFRESH_TOKEN=${tokenData.refresh_token}</pre>
+      <p>Access token expires in ${tokenData.expires_in} seconds.</p>
+    `);
+  } catch (error) {
+    console.error('Error during Microsoft OAuth callback:', error);
+    res.status(500).send(`Authentication error: ${error.message}`);
+  }
 });

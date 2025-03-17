@@ -1,5 +1,9 @@
 import { google } from 'googleapis';
 import 'dotenv/config';
+import dotenv from 'dotenv';
+
+// Load calendar-specific environment variables
+dotenv.config({ path: '.env.calendar' });
 
 // Setup Google Calendar API
 const oauth2Client = new google.auth.OAuth2(
