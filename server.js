@@ -296,11 +296,22 @@ async function createUltravoxCall(options = {}) {
     const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
     const timezone = userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Eastern Time';
     
-    // Add time directly to the beginning of the system prompt
-    let finalSystemPrompt = systemPrompt;
-    if (!finalSystemPrompt) {
-        finalSystemPrompt = getSystemPrompt(isOutbound, agentName, userEmail, userLocalTimeString, userTimeZone);
+    // Get the base system prompt - either from options or from environment
+    let basePrompt = systemPrompt;
+    if (!basePrompt) {
+        // Get the appropriate system prompt from environment variables
+        basePrompt = isOutbound ? 
+            process.env.OUTBOUND_SYSTEM_PROMPT :
+            process.env.INBOUND_SYSTEM_PROMPT;
+            
+        console.log('Using system prompt from environment:', isOutbound ? 'OUTBOUND_SYSTEM_PROMPT' : 'INBOUND_SYSTEM_PROMPT');
+        console.log('System prompt content:', basePrompt ? basePrompt.substring(0, 100) + '...' : 'Not found');
+    } else {
+        console.log('Using custom system prompt provided in options');
     }
+    
+    // Add time directly to the beginning of the system prompt
+    let finalSystemPrompt = basePrompt || '';
     
     // Add the exact time instruction at the very beginning of the prompt
     finalSystemPrompt = `CRITICAL INSTRUCTION: The current time is EXACTLY ${exactTimeString} in ${timezone}. You MUST begin your conversation by saying "Good ${timeOfDay}! It's ${exactTimeString} in ${timezone} right now."\n\n${finalSystemPrompt}`;
@@ -309,12 +320,14 @@ async function createUltravoxCall(options = {}) {
 
     // Create base call config
     const callConfig = {
-        systemPrompt: processSystemPrompt(finalSystemPrompt, agentName),
-        model: 'fixie-ai/ultravox-70B',  // Ensure we use 70B model which handles tools better
+        systemPrompt: process.env.INBOUND_SYSTEM_PROMPT ? 
+            `${process.env.INBOUND_SYSTEM_PROMPT}\n\n${finalSystemPrompt}` : 
+            finalSystemPrompt,
+        model: 'fixie-ai/ultravox-70B',
         voice: voiceId || AI_VOICE,
         temperature: AI_TEMPERATURE,
         firstSpeaker: isOutbound ? OUTBOUND_FIRST_SPEAKER : INBOUND_FIRST_SPEAKER,
-        medium: medium || { "twilio": {} }, // Use provided medium or default to twilio
+        medium: medium || { "twilio": {} },
         recordingEnabled: true,
         selectedTools: []
     };
@@ -335,11 +348,6 @@ async function createUltravoxCall(options = {}) {
         if (tools.length > 0) {
             callConfig.selectedTools = callConfig.selectedTools.concat(tools);
             console.info(`Configured ${tools.length} tools for ${isOutbound ? 'outbound' : 'inbound'} call.`);
-            
-            // Enhance the system prompt with tool information if guidelines exist
-            if (process.env.ULTRAVOX_TOOL_GUIDELINES) {
-                callConfig.systemPrompt = enhancePromptWithToolInfo(callConfig.systemPrompt, toolNames);
-            }
         }
     } else {
         console.info('Optional tools disabled for this call');
@@ -391,7 +399,7 @@ Important: You have access to several tools that enhance your capabilities. Alwa
 `;
     }
 
-    console.log('Final call configuration:', JSON.stringify(callConfig, null, 2));
+    console.log('Sending request to Ultravox API:', JSON.stringify(callConfig, null, 2));
 
     return new Promise((resolve, reject) => {
         // Create HTTPS request
