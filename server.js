@@ -22,6 +22,10 @@ import {
   getAvailableTimeSlots as getMicrosoftAvailableTimeSlots,
   createCalendarEvent as createMicrosoftCalendarEvent
 } from './utils/microsoft-calendar.js';
+import cors from 'cors';
+import session from 'express-session';
+import bodyParser from 'body-parser';
+import multer from 'multer';
 
 // Load additional environment files
 import dotenv from 'dotenv';
@@ -32,9 +36,60 @@ dotenv.config({ path: '.env.tools' });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables
+dotenv.config();
+
+// Create Express app
 const app = express();
+const server = http.createServer(app);
+
+// Add CORS middleware with proper headers for all routes
+app.use((req, res, next) => {
+  // Allow any origin for all routes
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send();
+  }
+  
+  next();
+});
+
+// Specific CORS and content-type headers for SDK and widget files
+app.use(['/ultravox-sdk', '/widget'], (req, res, next) => {
+  // Ensure these paths can be accessed from any domain with proper headers
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  
+  // Set appropriate MIME types based on file extension
+  if (req.path.endsWith('.js') || req.path.endsWith('.mjs')) {
+    res.header('Content-Type', 'application/javascript');
+  } else if (req.path.endsWith('.json')) {
+    res.header('Content-Type', 'application/json');
+  } else if (req.path.endsWith('.mp3')) {
+    res.header('Content-Type', 'audio/mpeg');
+  } else if (req.path.endsWith('.wav')) {
+    res.header('Content-Type', 'audio/wav');
+  }
+  
+  next();
+});
+
+// Set up middleware for parsing requests
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Enable CORS for all routes - essential for remote widget embedding
+app.use(cors({
+  origin: '*', // Allow any origin to embed the widget
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-API-Key', 'X-Requested-With', 'Accept', 'Origin'],
+  credentials: true
+}));
 
 const DEBUG = false; // Set to false to disable logging
 
@@ -89,8 +144,36 @@ app.use(fileUpload({
     tempFileDir: '/tmp/'
 }));
 
-// Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files from the public directory with proper CORS headers
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, path, stat) => {
+        // Set CORS headers for all static files
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+        
+        // Set proper MIME types for different file types
+        if (path.endsWith('.js') || path.endsWith('.mjs')) {
+            res.set('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.json')) {
+            res.set('Content-Type', 'application/json');
+        } else if (path.endsWith('.mp3')) {
+            res.set('Content-Type', 'audio/mpeg');
+        } else if (path.endsWith('.wav')) {
+            res.set('Content-Type', 'audio/wav');
+        }
+    }
+}));
+
+// Explicitly serve files from public/node_modules with proper MIME types
+app.use('/node_modules', express.static(path.join(__dirname, 'public/node_modules'), {
+    setHeaders: (res, path, stat) => {
+        if (path.endsWith('.js') || path.endsWith('.mjs')) {
+            res.set('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.json')) {
+            res.set('Content-Type', 'application/json');
+        }
+    }
+}));
 
 // Configuration from environment variables
 const PORT = process.env.PORT || 3000;
@@ -124,7 +207,7 @@ const AI_TEMPERATURE = parseFloat(process.env.AI_TEMPERATURE) || 0.3;
 const OUTBOUND_FIRST_SPEAKER = process.env.OUTBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_USER';
 const INBOUND_FIRST_SPEAKER = process.env.INBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_AGENT';
 // Use a static preprompt instead of reading from env
-const AGENT_PREPROMPT = "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets like [nervous laugh], [pauses], [thinking], etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. CRITICAL: You MUST begin your conversation by acknowledging the user's EXACT current local time that is provided to you with an appropriate greeting (e.g., 'Good morning! It's 11:45 AM where you are.'). Please strictly adhere to the following prompt:";
+const AGENT_PREPROMPT = process.env.AGENT_PREPROMPT || "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets or asterisk like [nervous laugh], [pauses], *thinking*, etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. CRITICAL: You MUST begin your conversation by acknowledging the user's current local time that is provided to you with an appropriate greeting (e.g., 'Good morning! It's 11:45 AM where you are.'). :";
 // Process system prompt by replacing variables
 function processSystemPrompt(prompt, agentName) {
     // Use the provided agent name or fall back to the default AI_NAME
@@ -158,7 +241,16 @@ function getSystemPrompt(isOutbound = false, agentName = null, userEmail = null,
     
     // Add calendar scheduling capabilities
     const calendarOwner = process.env.CALENDAR_OWNER ? `for ${process.env.CALENDAR_OWNER}` : '';
-    prompt += `\n\nYou are also a scheduling assistant${calendarOwner}. You can check calendar availability and schedule appointments. 
+    
+    // Use calendar prompt from environment if available
+    if (process.env.CALENDAR_PROMPT) {
+        let calendarPrompt = process.env.CALENDAR_PROMPT;
+        // Replace placeholders
+        calendarPrompt = calendarPrompt.replace(/{CALENDAR_OWNER}/g, process.env.CALENDAR_OWNER || 'AI Assistant');
+        prompt += `\n\n${calendarPrompt}`;
+    } else {
+        // Fallback to hardcoded prompt
+        prompt += `\n\nYou are also a scheduling assistant${calendarOwner}. You can check calendar availability and schedule appointments. 
 When a user asks about scheduling a meeting or call:
 1. ${process.env.CALENDAR_OWNER ? `Explain that you're helping schedule a call with ${process.env.CALENDAR_OWNER}` : 'Ask what the meeting is about'}
 2. Ask them what day or time range they're interested in
@@ -175,12 +267,27 @@ When a user selects a specific time, use the calendar-schedule tool to create th
 - summary: A brief title for the appointment (e.g., "Call with ${process.env.CALENDAR_OWNER || 'AI Assistant'}")
 - description: Optional details about the appointment
 - attendees: Array of email addresses for attendees`;
+    }
 
     // Add user email to attendees if provided
     if (userEmail) {
-        prompt += `\n\nThe user's email address is "${userEmail}". Always include this email in the attendees array when scheduling appointments using the calendar-schedule tool. Example: [{"email": "${userEmail}"}]`;
+        if (process.env.EMAIL_PROMPT_WITH_EMAIL) {
+            let emailPrompt = process.env.EMAIL_PROMPT_WITH_EMAIL;
+            emailPrompt = emailPrompt.replace(/{USER_EMAIL}/g, userEmail);
+            // Don't add email prompt as it's being moved to a separate landing page
+            // prompt += `\n\n${emailPrompt}`;
+        } else {
+            // Don't add email prompt as it's being moved to a separate landing page
+            // prompt += `\n\nThe user's email address is "${userEmail}". Always include this email in the attendees array when scheduling appointments using the calendar-schedule tool. Example: [{"email": "${userEmail}"}]`;
+        }
     } else {
-        prompt += `\n\nIf the user provides their email address during the conversation, include it in the attendees array when scheduling. Example: [{"email": "user@example.com"}]`;
+        if (process.env.EMAIL_PROMPT_WITHOUT_EMAIL) {
+            // Don't add email prompt as it's being moved to a separate landing page
+            // prompt += `\n\n${process.env.EMAIL_PROMPT_WITHOUT_EMAIL}`;
+        } else {
+            // Don't add email prompt as it's being moved to a separate landing page
+            // prompt += `\n\nIf the user provides their email address during the conversation, include it in the attendees array when scheduling. Example: [{"email": "user@example.com"}]`;
+        }
     }
     
     // Add tool information if tools are enabled
@@ -289,40 +396,73 @@ async function createUltravoxCall(options = {}) {
     // Get current time for the system prompt
     const now = new Date();
     const hour = now.getHours();
-    const minute = now.getMinutes();
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    const exactTimeString = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
     const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
-    const timezone = userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Eastern Time';
+    const timezone = userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
     
-    // Get the base system prompt - either from options or from environment
-    let basePrompt = systemPrompt;
-    if (!basePrompt) {
-        // Get the appropriate system prompt from environment variables
-        basePrompt = isOutbound ? 
-            process.env.OUTBOUND_SYSTEM_PROMPT :
-            process.env.INBOUND_SYSTEM_PROMPT;
-            
-        console.log('Using system prompt from environment:', isOutbound ? 'OUTBOUND_SYSTEM_PROMPT' : 'INBOUND_SYSTEM_PROMPT');
-        console.log('System prompt content:', basePrompt ? basePrompt.substring(0, 100) + '...' : 'Not found');
+    // Format time with day of week and date in a clean format
+    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
+    const dateString = now.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: timezone 
+    });
+    
+    // Format time manually to ensure no seconds
+    const hour12 = hour % 12 || 12;
+    const minutes = now.getMinutes();
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    
+    // Create time string in format like "three pm" or "three thirty pm"
+    let timeString;
+    if (minutes === 0) {
+        timeString = `${hour12} ${ampm.toLowerCase()}`;
     } else {
-        console.log('Using custom system prompt provided in options');
+        timeString = `${hour12} ${minutes < 10 ? 'oh' : ''} ${minutes} ${ampm.toLowerCase()}`;
     }
     
-    // Add time directly to the beginning of the system prompt
-    let finalSystemPrompt = basePrompt || '';
+    // Combine into a clean format
+    const exactTimeString = userLocalTimeString || timeString;
     
-    // Add the exact time instruction at the very beginning of the prompt
-    finalSystemPrompt = `CRITICAL INSTRUCTION: The current time is EXACTLY ${exactTimeString} in ${timezone}. You MUST begin your conversation by saying "Good ${timeOfDay}! It's ${exactTimeString} in ${timezone} right now."\n\n${finalSystemPrompt}`;
-    
-    console.log('Using system prompt with time:', exactTimeString, 'in timezone:', timezone);
+    // Add time instruction at the very beginning - with date and timezone
+    const timeInstruction = `The current time is ${timeString} on ${dayOfWeek}, ${dateString} in the ${timezone} timezone. Begin your conversation by saying "Hello, it's ${timeString}, ${dayOfWeek} ${timeOfDay}." Then continue with a friendly introduction and ask how you can help them today. IMPORTANT: When saying times, always use formats like "three pm" or "three thirty pm".\n\n`;
 
+    // Get the appropriate system prompt based on call type
+    const basePrompt = isOutbound ? 
+        process.env.OUTBOUND_SYSTEM_PROMPT : 
+        process.env.INBOUND_SYSTEM_PROMPT;
+    
+    // Get the final system prompt with all enhancements
+    const finalSystemPrompt = systemPrompt ? 
+        processSystemPrompt(systemPrompt, agentName) : 
+        getSystemPrompt(isOutbound, agentName || AI_NAME, userEmail, userLocalTimeString, userTimeZone);
+
+    // Combine prompts in the correct order: time instruction -> base prompt, but don't add time instruction if system prompt is provided
+    const combinedPrompt = systemPrompt ? 
+        systemPrompt : // Just use the provided system prompt as is
+        (basePrompt ? 
+            `${timeInstruction}Your name is ${agentName || AI_NAME} and you are ${basePrompt.replace(/{AGENT_NAME}/g, agentName || AI_NAME)}` : 
+            `${timeInstruction}${finalSystemPrompt}`);
+
+    // Add stronger emphasis on proactive tool usage, but only for auto-generated prompts (not user-provided ones)
+    const enhancedPrompt = systemPrompt ? 
+        systemPrompt : // Keep user-provided system prompt as is
+        `${combinedPrompt}\n\nCRITICAL INSTRUCTION: You MUST use your tools PROACTIVELY without waiting to be asked. Specifically:
+1. When ANY conversation about scheduling, availability, or meetings occurs, IMMEDIATELY use the calendar tool to check availability WITHOUT SAYING "let me check the calendar" first
+2. ALWAYS check and quote available time slots BEFORE scheduling any meeting - never schedule without first checking availability
+3. When showing available times, group them by morning (9am-12pm), afternoon (12pm-5pm), and evening (5pm-8pm)
+4. Only use the calendar-schedule tool AFTER you've checked availability and the user has selected a specific time
+5. NEVER wait for the user to explicitly ask you to check the calendar or schedule something
+6. Take initiative in the conversation - if the user mentions anything about meeting or talking later, proactively offer to schedule it
+7. NEVER announce that you're about to use a tool - just use it and then respond with the results
+8. DO NOT say phrases like "Let me check that for you" or "Let me look that up" - just immediately use the appropriate tool
+9. For the hangUp tool, use it when the conversation has reached a natural conclusion
+10. ALWAYS confirm meeting details after scheduling by saying something like "Great! I've scheduled your meeting with Half for [day] at [time]. You'll receive a calendar invitation shortly."
+11. When confirming meetings, be specific about the exact day and time that was scheduled`;
+    
     // Create base call config
     const callConfig = {
-        systemPrompt: process.env.INBOUND_SYSTEM_PROMPT ? 
-            `${process.env.INBOUND_SYSTEM_PROMPT}\n\n${finalSystemPrompt}` : 
-            finalSystemPrompt,
+        systemPrompt: enhancedPrompt,
         model: 'fixie-ai/ultravox-70B',
         voice: voiceId || AI_VOICE,
         temperature: AI_TEMPERATURE,
@@ -1569,7 +1709,7 @@ app.post('/webrtc-join-url', async (req, res) => {
         
         // Create Ultravox call with WebRTC medium
         const response = await createUltravoxCall({
-            systemPrompt: systemPrompt || process.env.INBOUND_SYSTEM_PROMPT,
+            systemPrompt,
             voiceId,
             corpusId,
             agentName,
@@ -1586,9 +1726,25 @@ app.post('/webrtc-join-url', async (req, res) => {
         
         console.log('Created WebRTC call with join URL');
         
+        // Generate a shareable URL for widget integration
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const widgetPageUrl = `${baseUrl}/widget/`;
+        const shareableUrl = `${baseUrl}/?`;
+        let shareableParams = [];
+        
+        if (voiceId) shareableParams.push(`voice=${encodeURIComponent(voiceId)}`);
+        if (agentName) shareableParams.push(`agent=${encodeURIComponent(agentName)}`);
+        if (corpusId) shareableParams.push(`corpus=${encodeURIComponent(corpusId)}`);
+        if (systemPrompt) shareableParams.push(`prompt=${encodeURIComponent(systemPrompt)}`);
+        
+        const fullShareableUrl = shareableUrl + shareableParams.join('&');
+        
         res.json({
             success: true,
-            joinUrl: response.joinUrl
+            joinUrl: response.joinUrl,
+            widgetUrl: widgetPageUrl,
+            shareableUrl: fullShareableUrl,
+            widgetIntegrationNote: "You can now integrate this voice agent on your website using our widget. Visit the widget page for instructions."
         });
         
     } catch (error) {
@@ -1606,9 +1762,6 @@ app.use('/ultravox-sdk', express.static(path.join(__dirname, 'public/ultravox-sd
 
 // Setup WebSocket server for Telnyx media streaming
 // Create an HTTP server
-const server = http.createServer(app);
-
-// Create a WebSocket server using the HTTP server
 const wss = new WebSocketServer({ 
     server,
     path: '/stream-ws'
@@ -2163,6 +2316,28 @@ app.post('/api/calendar/schedule', async (req, res) => {
     
     console.log(`Scheduling event from ${startTime} to ${endTime} using ${calendarProvider}`);
     
+    // Ensure attendees is always an array
+    let parsedAttendees = [];
+    if (attendees) {
+      try {
+        // If attendees is a string (JSON), parse it
+        if (typeof attendees === 'string') {
+          parsedAttendees = JSON.parse(attendees);
+        } else if (Array.isArray(attendees)) {
+          parsedAttendees = attendees;
+        } else if (typeof attendees === 'object') {
+          // If it's a single object, wrap it in an array
+          parsedAttendees = [attendees];
+        }
+      } catch (error) {
+        console.error('Error parsing attendees:', error);
+        // Default to empty array if parsing fails
+        parsedAttendees = [];
+      }
+    }
+    
+    console.log('Parsed attendees:', parsedAttendees);
+    
     // Create calendar event based on the provider
     let event;
     if (calendarProvider.toLowerCase() === 'microsoft') {
@@ -2171,7 +2346,7 @@ app.post('/api/calendar/schedule', async (req, res) => {
         endTime,
         summary: summary || 'Scheduled Meeting',
         description: description || '',
-        attendees: attendees || []
+        attendees: parsedAttendees
       });
     } else {
       // Default to Google Calendar
@@ -2180,7 +2355,7 @@ app.post('/api/calendar/schedule', async (req, res) => {
         endTime,
         summary: summary || 'Scheduled Meeting',
         description: description || '',
-        attendees: attendees || []
+        attendees: parsedAttendees
       });
     }
     
@@ -2220,16 +2395,37 @@ app.post('/api/calendar/schedule', async (req, res) => {
       return `${datePart} at ${formattedTime}`;
     };
     
-    // Add formatted times to the response
-    const formattedEvent = {
-      ...event,
+    // Create a simplified response with only essential information
+    const simplifiedEvent = {
+      summary: event.summary,
       formattedStart: formatTimeInET(event.start.dateTime),
-      formattedEnd: formatTimeInET(event.end.dateTime)
+      formattedEnd: formatTimeInET(event.end.dateTime),
+      attendees: event.attendees.map(attendee => attendee.email).join(', '),
+      status: 'confirmed'
     };
     
+    // Log the full event for debugging
+    console.log('Full event details:', JSON.stringify(event, null, 2));
+    
+    // Clean up any Microsoft Teams details that could confuse the AI
+    if (event.description && event.description.includes('Microsoft Teams')) {
+      // Extract just the first part of the description before the Teams details
+      const cleanDescription = event.description.split('______')[0].trim();
+      // Update the simplified event with the clean description
+      simplifiedEvent.description = cleanDescription;
+    } else {
+      // For non-Teams events, just use the description as is
+      simplifiedEvent.description = event.description || '';
+    }
+    
+    // Create a clear confirmation message without any Teams meeting details
+    const confirmationMessage = `Meeting scheduled successfully for ${simplifiedEvent.formattedStart}. A calendar invitation has been sent to ${simplifiedEvent.attendees}.`;
+    
+    // Return only the simplified event to the client
     res.json({
       success: true,
-      event: formattedEvent
+      message: confirmationMessage,
+      event: simplifiedEvent
     });
   } catch (error) {
     console.error('Error scheduling calendar event:', error);
