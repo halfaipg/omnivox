@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Agent Widget Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f9f9f9;
+    }
+    
+    header {
+      background-color: #4285f4;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    h1 {
+      margin: 0;
+      font-size: 2em;
+    }
+    
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    h2 {
+      color: #4285f4;
+      margin-top: 0;
+    }
+    
+    pre {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Courier New', Courier, monospace;
+      position: relative;
+    }
+    
+    .copy-button {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+    }
+    
+    .copy-button:hover {
+      opacity: 1;
+    }
+    
+    .copy-success {
+      position: absolute;
+      top: 8px;
+      right: 70px;
+      background-color: #34a853;
+      color: white;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      display: none;
+    }
+    
+    code {
+      font-family: 'Courier New', Courier, monospace;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    
+    input[type="text"], select, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    
+    textarea {
+      height: 100px;
+      resize: vertical;
+    }
+    
+    button {
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    button:hover {
+      background-color: #3367d6;
+    }
+    
+    button:disabled {
+      background-color: #a9c3f5;
+      cursor: not-allowed;
+    }
+    
+    #widget-container {
+      margin-top: 20px;
+    }
+    
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .preview-header h3 {
+      margin: 0;
+    }
+    
+    .preview-controls {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 14px;
+    }
+    
+    .note {
+      background-color: #fff3cd;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      border-left: 4px solid #ffc107;
+    }
+    
+    .step {
+      display: flex;
+      margin-bottom: 10px;
+    }
+    
+    .step-number {
+      width: 24px;
+      height: 24px;
+      background-color: #4285f4;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    
+    .step-content {
+      flex: 1;
+    }
+    
+    /* Configuration tabs */
+    .config-tabs {
+      display: flex;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .config-tab {
+      padding: 10px 15px;
+      cursor: pointer;
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      margin-right: 5px;
+    }
+    
+    .config-tab.active {
+      background-color: white;
+      border-bottom: 1px solid white;
+      margin-bottom: -1px;
+      font-weight: 500;
+    }
+    
+    .config-content {
+      display: none;
+      padding-top: 10px;
+    }
+    
+    .config-content.active {
+      display: block;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: #4285f4;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Avatar upload component styles */
+    .avatar-input-container {
+      margin-top: 8px;
+    }
+    
+    .avatar-input-options {
+      display: flex;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .avatar-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      margin-right: 5px;
+    }
+    
+    .avatar-option.active {
+      background-color: white;
+      border-bottom: 1px solid white;
+      margin-bottom: -1px;
+      font-weight: 500;
+    }
+    
+    .avatar-input {
+      display: none;
+      padding-top: 10px;
+    }
+    
+    .avatar-input.active {
+      display: block;
+    }
+    
+    .avatar-upload-preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    #avatar-preview-container {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 15px;
+      cursor: pointer;
+      border: 2px solid #4285f4;
+    }
+    
+    #avatar-preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+    
+    .avatar-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s;
+      color: white;
+      font-size: 14px;
+    }
+    
+    #avatar-preview-container:hover .avatar-overlay {
+      opacity: 1;
+    }
+    
+    .avatar-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+    
+    #avatar-zoom {
+      width: 60%;
+      margin-right: 5px;
+    }
+    
+    .cropper-container {
+      margin: 15px auto;
+    }
+    
+    /* Modal for cropping */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      overflow: auto;
+    }
+    
+    .modal-content {
+      background-color: white;
+      margin: 10% auto;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+      position: relative;
+    }
+    
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    
+    .crop-container {
+      width: 100%;
+      height: 300px;
+      margin: 20px 0;
+      position: relative;
+    }
+    
+    .crop-image {
+      display: block;
+      max-width: 100%;
+      max-height: 300px;
+    }
+  </style>
+  <!-- First load the import map to resolve module dependencies -->
+  <script src="importmap.js"></script>
+  
+  <!-- Then try to load the Ultravox SDK -->
+  <script type="module">
+    // Preload the Ultravox SDK
+    async function preloadUltravoxSDK() {
+      try {
+        const { UltravoxSession } = await import('/ultravox-sdk/esm/index.js');
+        window.UltravoxSession = UltravoxSession;
+        console.log('Ultravox SDK preloaded successfully');
+      } catch(error) {
+        console.error('Failed to preload Ultravox SDK:', error);
+      }
+    }
+    
+    // Call the preload function
+    preloadUltravoxSDK();
+    
+    // Patch Ultravox SDK to fix missing setAudioContext method
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wait for the SDK to load before applying patches
+      const checkForUltravox = setInterval(function() {
+        if (window.UltravoxSession) {
+          clearInterval(checkForUltravox);
+          console.log('Applying Ultravox SDK patches...');
+          
+          // Patch 1: Store the original createLocalAudioTrack method
+          const originalCreateLocalAudioTrack = window.UltravoxSession.prototype.createLocalAudioTrack;
+          
+          // Override the createLocalAudioTrack method to ensure the track has setAudioContext
+          window.UltravoxSession.prototype.createLocalAudioTrack = async function() {
+            const track = await originalCreateLocalAudioTrack.call(this);
+            
+            // Add the missing method if it doesn't exist
+            if (track && !track.setAudioContext) {
+              console.log('PATCH: Adding setAudioContext method to newly created track');
+              track.setAudioContext = function() {
+                // No-op implementation
+                return this;
+              };
+            }
+            
+            return track;
+          };
+          
+          // Patch 2: Store the original handleSocketMessage method
+          const originalHandleSocketMessage = window.UltravoxSession.prototype.handleSocketMessage;
+          
+          // Override the handleSocketMessage method to handle setAudioContext
+          window.UltravoxSession.prototype.handleSocketMessage = function(event) {
+            try {
+              // Add the missing method if it doesn't exist
+              if (this.localAudioTrack && !this.localAudioTrack.setAudioContext) {
+                console.log('PATCH: Adding setAudioContext method to localAudioTrack in handleSocketMessage');
+                this.localAudioTrack.setAudioContext = function(audioContext) {
+                  console.log('PATCH: setAudioContext called with', audioContext);
+                  // Do nothing, this is just a stub to prevent errors
+                  return this;
+                };
+              }
+              
+              // Call the original method with try/catch to prevent uncaught errors
+              return originalHandleSocketMessage.call(this, event);
+            } catch (error) {
+              console.error('PATCH: Caught error in handleSocketMessage:', error);
+              // Try to recover
+              if (error.message && error.message.includes('setAudioContext is not a function')) {
+                console.log('PATCH: Recovering from setAudioContext error');
+                
+                // Force the audio context to be set on the track
+                if (this.localAudioTrack) {
+                  this.localAudioTrack.setAudioContext = function() { return this; };
+                }
+              }
+            }
+          };
+          
+          // Patch 3: Also patch the joinCall method to ensure localAudioTrack has the method
+          const originalJoinCall = window.UltravoxSession.prototype.joinCall;
+          window.UltravoxSession.prototype.joinCall = async function(joinUrl) {
+            console.log('PATCH: Patched joinCall called');
+            
+            // Ensure audio context is created before joining
+            if (!this.audioContext && typeof AudioContext !== 'undefined') {
+              this.audioContext = window.globalAudioContext || new AudioContext();
+              console.log('PATCH: Using audio context in joinCall:', this.audioContext);
+            }
+            
+            try {
+              // Call the original method
+              const result = await originalJoinCall.call(this, joinUrl);
+              
+              // Ensure localAudioTrack has setAudioContext method after joining
+              if (this.localAudioTrack && !this.localAudioTrack.setAudioContext) {
+                console.log('PATCH: Adding setAudioContext method to localAudioTrack after join');
+                this.localAudioTrack.setAudioContext = function(audioContext) {
+                  console.log('PATCH: setAudioContext called with', audioContext);
+                  // Do nothing, this is just a stub to prevent errors
+                  return this;
+                };
+              }
+              
+              return result;
+            } catch (error) {
+              console.error('PATCH: Error in joinCall:', error);
+              
+              // Try to recover if it's the setAudioContext error
+              if (error.message && error.message.includes('setAudioContext is not a function')) {
+                console.log('PATCH: Recovering from setAudioContext error in joinCall');
+                
+                // Add the method and retry
+                if (this.localAudioTrack) {
+                  this.localAudioTrack.setAudioContext = function() { return this; };
+                  // Retry the operation that failed
+                  return await originalJoinCall.call(this, joinUrl);
+                }
+              }
+              
+              throw error; // Re-throw if we couldn't recover
+            }
+          };
+          
+          console.log('Ultravox SDK patches applied successfully');
+        }
+      }, 100);
+    });
+  </script>
+  <script src="voice-agent-widget.js"></script>
+  <!-- Add Cropperjs CSS and JS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Voice Agent Widget Demo</h1>
+  </header>
+  
+  <main>
+    <div class="section">
+      <h2>Getting Started</h2>
+      <div class="note">
+        <strong>Note:</strong> This widget uses the WebRTC feature and connects to the same server as the main application. Make sure you've set up the Ultravox API integration properly.
+      </div>
+      
+      <h3>Two Ways to Configure Your Widget</h3>
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <strong>Shareable URL:</strong> Use a pre-configured URL from the main voice agent interface.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <strong>Manual Configuration:</strong> Directly configure your agent settings including name, voice, corpus, and system prompt.
+        </div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Configure Your Widget</h2>
+      
+      <div class="config-tabs">
+        <div class="config-tab active" data-config="url">Use Shareable URL</div>
+        <div class="config-tab" data-config="manual">Manual Configuration</div>
+      </div>
+      
+      <!-- URL Configuration -->
+      <div class="config-content active" id="url-config">
+        <div class="form-group">
+          <label for="shareable-url">Shareable URL: <span style="color: #f44336">*</span></label>
+          <input type="text" id="shareable-url" placeholder="Paste your shareable URL here (e.g., https://yourdomain.com/?voice=abc&agent=AI%20Assistant&corpus=xyz)">
+          <small>Get this URL from the main voice agent interface after a call.</small>
+        </div>
+      </div>
+      
+      <!-- Manual Configuration -->
+      <div class="config-content" id="manual-config">
+        <div class="form-group">
+          <label for="agent-voice">Voice:</label>
+          <select id="agent-voice">
+            <option value="">Loading voices...</option>
+          </select>
+          <small>Select a voice for your AI agent</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="agent-corpus">Knowledge Base (optional):</label>
+          <select id="agent-corpus">
+            <option value="">No corpus (RAG disabled)</option>
+            <!-- Corpus options will be loaded dynamically -->
+          </select>
+          <small>Select a knowledge base for your agent or leave empty to disable RAG</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="agent-name-manual">Agent Name:</label>
+          <input type="text" id="agent-name-manual" placeholder="Enter agent name (e.g., AI Assistant)">
+          <small>The name your agent will introduce itself as</small>
+        </div>
+        
+        <div class="form-group">
+          <label for="agent-prompt">System Prompt (optional):</label>
+          <textarea id="agent-prompt" placeholder="Enter instructions for how the agent should behave..."></textarea>
+          <small>Instructions that define how your agent behaves and responds</small>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="agent-name">Display Name: (optional - will use name from configuration)</label>
+        <input type="text" id="agent-name" placeholder="e.g., AI Assistant, Customer Support, etc.">
+        <small>Override the display name in the widget UI (does not change the agent's identity)</small>
+      </div>
+      
+      <div class="form-group">
+        <label for="avatar-url">Avatar Image:</label>
+        <div class="avatar-input-container">
+          <div class="avatar-input-options">
+            <div class="avatar-option active" data-option="url">URL</div>
+            <div class="avatar-option" data-option="upload">Upload</div>
+          </div>
+          
+          <div class="avatar-input active" id="avatar-url-input">
+            <input type="text" id="avatar-url" placeholder="URL to your avatar image">
+          </div>
+          
+          <div class="avatar-input" id="avatar-upload-input">
+            <div class="avatar-upload-preview">
+              <div id="avatar-preview-container">
+                <img id="avatar-preview" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgdmlld0JveD0iMCAwIDgwIDgwIj48Y2lyY2xlIGN4PSI0MCIgY3k9IjQwIiByPSI0MCIgZmlsbD0iIzQyODVmNCIvPjxwYXRoIGQ9Ik00MCwyMCBDMzUsMjAgMzEsMjQgMzEsMjkgQzMxLDM0IDM1LDM4IDQwLDM4IEM0NSwzOCA0OSwzNCA0OSwyOSBDNDksMjQgNDUsMjAgNDAsMjAgWiBNMjUsNTggQzI1LDQ4IDMxLDQ0IDQwLDQ0IEM0OSw0NCA1NSw0OCA1NSw1OCBMNTUsNjAgTDI1LDYwIFoiIGZpbGw9IiNGRkZGRkYiLz48L3N2Zz4=" alt="Avatar preview">
+                <div class="avatar-overlay">
+                  <span>Upload Image</span>
+                </div>
+              </div>
+              <div class="avatar-controls" style="display: none;">
+                <input type="range" id="avatar-zoom" min="1" max="3" step="0.1" value="1">
+                <label for="avatar-zoom">Zoom</label>
+                <button id="avatar-rotate" class="btn-sm">Rotate</button>
+                <button id="avatar-save" class="btn-sm">Save</button>
+                <button id="avatar-cancel" class="btn-sm">Cancel</button>
+              </div>
+            </div>
+            <input type="file" id="avatar-file" accept="image/*" style="display: none;">
+            <button id="upload-avatar-btn" class="btn-sm">Upload Image</button>
+          </div>
+          
+          <input type="hidden" id="avatar-data" name="avatar-data">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="position">Widget Position:</label>
+        <select id="position">
+          <option value="bottom-right">Bottom Right</option>
+          <option value="bottom-left">Bottom Left</option>
+          <option value="top-right">Top Right</option>
+          <option value="top-left">Top Left</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="theme">Theme:</label>
+        <select id="theme">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      
+      <button id="create-widget">Create Widget</button>
+      <button id="refresh-data" class="btn-sm" style="background-color: #999;">Refresh Voices & Corpora</button>
+    </div>
+    
+    <div class="section">
+      <div class="preview-header">
+        <h3>Widget Preview</h3>
+        <div class="preview-controls">
+          <button class="btn-sm" id="reset-widget">Reset</button>
+          <button class="btn-sm" id="toggle-widget" style="margin-left: 8px;">Expand Widget</button>
+        </div>
+      </div>
+      <div id="widget-container" style="min-height: 500px; background-color: #f5f5f5; border-radius: 8px; overflow: hidden; position: relative;"></div>
+      <div class="preview-note" style="margin-top: 10px; font-size: 14px; color: #666;">
+        <p>This preview shows how the widget will appear on your website. The widget is loaded in an iframe displaying the actual widget code.</p>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Integration Code</h2>
+      <p>Use this code to add the widget to your website:</p>
+      
+      <h3>Option 1: One-Line Integration</h3>
+      <pre><code id="one-line-code">&lt;script src="https://yourdomain.com/widget/embed.js?url=YOUR_SHAREABLE_URL&theme=light&position=bottom-right"&gt;&lt;/script&gt;</code>
+        <button class="copy-button" data-target="one-line-code">Copy Code</button>
+        <span class="copy-success">Copied!</span>
+      </pre>
+      
+      <h3>Option 2: Custom Integration</h3>
+      <pre><code id="custom-code">&lt;!-- Add the Voice Agent Widget script --&gt;
+&lt;script src="https://yourdomain.com/widget/voice-agent-widget.js"&gt;&lt;/script&gt;
+
+&lt;!-- Create a container for the widget --&gt;
+&lt;div id="voice-agent-container"&gt;&lt;/div&gt;
+
+&lt;script&gt;
+  // Initialize the widget
+  const voiceAgent = new VoiceAgentWidget({
+    agentUrl: 'YOUR_SHAREABLE_URL_HERE',
+    avatarUrl: 'https://example.com/avatar.png', // Optional
+    agentName: 'AI Assistant', // Optional
+    theme: 'light', // 'light' or 'dark'
+    position: 'bottom-right' // 'bottom-right', 'bottom-left', 'top-right', 'top-left'
+  });
+  
+  // Mount the widget to the container
+  voiceAgent.mount('voice-agent-container');
+&lt;/script&gt;</code>
+        <button class="copy-button" data-target="custom-code">Copy Code</button>
+        <span class="copy-success">Copied!</span>
+      </pre>
+    </div>
+  </main>
+  
+  <!-- Avatar Crop Modal -->
+  <div id="avatar-crop-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close">&times;</span>
+      <h3>Crop Avatar Image</h3>
+      <p>Drag to position and use the slider to zoom. The circular area will be used as your avatar.</p>
+      <div class="crop-container">
+        <img id="crop-image" src="" alt="Avatar to crop" class="crop-image">
+      </div>
+      <div style="text-align: center; margin-top: 10px;">
+        <input type="range" id="crop-zoom" min="0.5" max="3" step="0.1" value="1">
+        <label for="crop-zoom">Zoom</label>
+        <button id="crop-rotate" class="btn-sm">Rotate</button>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 15px; gap: 10px;">
+        <button id="crop-cancel" class="btn-sm" style="background-color: #999;">Cancel</button>
+        <button id="crop-save">Apply</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const createWidgetButton = document.getElementById('create-widget');
+      const resetWidgetButton = document.getElementById('reset-widget');
+      const refreshDataButton = document.getElementById('refresh-data');
+      const oneLineCodeElement = document.getElementById('one-line-code');
+      const customCodeElement = document.getElementById('custom-code');
+      let widgetInstance = null;
+      let isWidgetExpanded = false; // Track widget expanded state
+      
+      // Listen for messages from the iframe
+      window.addEventListener('message', function(event) {
+        if (!event.data || !event.data.type) return;
+        
+        console.log('Received message from iframe:', event.data);
+        
+        switch (event.data.type) {
+          case 'iframe_loaded':
+            console.log('Iframe is ready', event.data);
+            break;
+            
+          case 'call_ended':
+          case 'minimize':
+            // Update the toggle button state when call ends or widget is minimized
+            const toggleButton = document.getElementById('toggle-widget');
+            if (toggleButton) {
+              toggleButton.textContent = 'Expand Widget';
+              isWidgetExpanded = false;
+            }
+            break;
+            
+          case 'expand':
+            // Update the toggle button state when widget is expanded
+            const expandButton = document.getElementById('toggle-widget');
+            if (expandButton) {
+              expandButton.textContent = 'Collapse Widget';
+              isWidgetExpanded = true;
+            }
+            break;
+        }
+      });
+      
+      // Set up code copy buttons
+      const copyButtons = document.querySelectorAll('.copy-button');
+      copyButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const targetId = this.getAttribute('data-target');
+          const targetElement = document.getElementById(targetId);
+          const successMessage = this.nextElementSibling;
+          
+          // Get text to copy - use the full code with base64 if available
+          let textToCopy = '';
+          if (targetElement.dataset.fullCode) {
+            textToCopy = targetElement.dataset.fullCode;
+          } else {
+            textToCopy = targetElement.textContent;
+          }
+          
+          // Create a temporary textarea to copy from
+          const textarea = document.createElement('textarea');
+          textarea.value = textToCopy;
+          document.body.appendChild(textarea);
+          textarea.select();
+          
+          try {
+            document.execCommand('copy');
+            
+            // Show success message
+            successMessage.style.display = 'inline-block';
+            setTimeout(() => {
+              successMessage.style.display = 'none';
+            }, 2000);
+            
+          } catch (err) {
+            console.error('Failed to copy text: ', err);
+          } finally {
+            document.body.removeChild(textarea);
+          }
+        });
+      });
+      
+      // Avatar upload and cropping variables
+      let cropper = null;
+      let avatarFile = null;
+      let currentAvatarDataUrl = null;
+      
+      // Avatar option selection
+      const avatarOptions = document.querySelectorAll('.avatar-option');
+      const avatarInputs = document.querySelectorAll('.avatar-input');
+      
+      avatarOptions.forEach(option => {
+        option.addEventListener('click', function() {
+          const optionType = this.getAttribute('data-option');
+          
+          // Update active option
+          avatarOptions.forEach(opt => opt.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Show active input
+          avatarInputs.forEach(input => {
+            input.classList.remove('active');
+            if (input.id === `avatar-${optionType}-input`) {
+              input.classList.add('active');
+            }
+          });
+          
+          // Update code samples
+          updateCodeSamples();
+        });
+      });
+      
+      // Handle file selection
+      const uploadBtn = document.getElementById('upload-avatar-btn');
+      const fileInput = document.getElementById('avatar-file');
+      const previewContainer = document.getElementById('avatar-preview-container');
+      
+      previewContainer.addEventListener('click', function() {
+        fileInput.click();
+      });
+      
+      uploadBtn.addEventListener('click', function() {
+        fileInput.click();
+      });
+      
+      fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+          const file = e.target.files[0];
+          
+          // Check file size (limit to 5MB)
+          if (file.size > 5 * 1024 * 1024) {
+            alert('File size too large. Please select an image under 5MB.');
+            return;
+          }
+          
+          // Check file type
+          if (!file.type.match('image.*')) {
+            alert('Please select an image file.');
+            return;
+          }
+          
+          avatarFile = file;
+          
+          // Open the cropping modal
+          openCropModal(file);
+        }
+      });
+      
+      // Crop modal functionality
+      const cropModal = document.getElementById('avatar-crop-modal');
+      const cropImage = document.getElementById('crop-image');
+      const cropZoom = document.getElementById('crop-zoom');
+      const cropRotate = document.getElementById('crop-rotate');
+      const cropSave = document.getElementById('crop-save');
+      const cropCancel = document.getElementById('crop-cancel');
+      const modalClose = document.querySelector('.modal-close');
+      
+      // Open crop modal with selected image
+      function openCropModal(file) {
+        // Create a URL for the selected file
+        const fileURL = URL.createObjectURL(file);
+        cropImage.src = fileURL;
+        
+        // Reset zoom slider
+        cropZoom.value = 1;
+        
+        // Show the modal
+        cropModal.style.display = 'block';
+        
+        // Initialize cropper after image is loaded
+        cropImage.onload = function() {
+          if (cropper) {
+            cropper.destroy();
+          }
+          
+          cropper = new Cropper(cropImage, {
+            aspectRatio: 1,
+            viewMode: 1,
+            guides: true,
+            center: true,
+            highlight: false,
+            background: false,
+            autoCrop: true,
+            autoCropArea: 0.8,
+            responsive: true,
+            cropBoxResizable: true,
+            cropBoxMovable: true,
+            dragMode: 'move',
+            toggleDragModeOnDblclick: false
+          });
+        };
+      }
+      
+      // Handle zoom
+      cropZoom.addEventListener('input', function() {
+        if (cropper) {
+          cropper.zoomTo(parseFloat(this.value));
+        }
+      });
+      
+      // Handle rotation
+      cropRotate.addEventListener('click', function() {
+        if (cropper) {
+          cropper.rotate(90);
+        }
+      });
+      
+      // Handle save
+      cropSave.addEventListener('click', async function() {
+        if (cropper) {
+          try {
+            // Show processing indicator
+            this.disabled = true;
+            this.innerHTML = 'Processing... <span class="loading-spinner"></span>';
+            
+            // Get the cropped canvas
+            const canvas = cropper.getCroppedCanvas({
+              width: 300,  // Larger initial size for better quality
+              height: 300,
+              fillColor: '#fff',
+              imageSmoothingEnabled: true,
+              imageSmoothingQuality: 'high'
+            });
+            
+            // Convert to data URL
+            const tempDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            
+            // Send to server for processing
+            const response = await fetch('/process-avatar', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                avatarData: tempDataUrl
+              })
+            });
+            
+            if (!response.ok) {
+              throw new Error('Failed to process avatar image');
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              // Use the processed image from the server
+              currentAvatarDataUrl = data.avatarUrl;
+              
+              // Update preview
+              document.getElementById('avatar-preview').src = currentAvatarDataUrl;
+              
+              // Set the data in the hidden input
+              document.getElementById('avatar-data').value = currentAvatarDataUrl;
+              
+              // Update avatar URL field with data URL
+              document.getElementById('avatar-url').value = '';
+              
+              // Close modal
+              closeCropModal();
+              
+              // Update code samples
+              updateCodeSamples();
+            } else {
+              throw new Error(data.error || 'Unknown error processing image');
+            }
+          } catch (error) {
+            console.error('Error processing avatar:', error);
+            alert('Failed to process avatar: ' + error.message);
+          } finally {
+            // Reset button state
+            this.disabled = false;
+            this.textContent = 'Apply';
+            
+            // Close modal if we had an error
+            if (cropModal.style.display === 'block') {
+              closeCropModal();
+            }
+          }
+        }
+      });
+      
+      // Handle cancel and close
+      cropCancel.addEventListener('click', closeCropModal);
+      modalClose.addEventListener('click', closeCropModal);
+      
+      function closeCropModal() {
+        cropModal.style.display = 'none';
+        if (cropper) {
+          cropper.destroy();
+          cropper = null;
+        }
+        // Revoke object URL to free memory
+        if (cropImage.src) {
+          URL.revokeObjectURL(cropImage.src);
+        }
+      }
+      
+      // Close modal when clicking outside
+      window.addEventListener('click', function(e) {
+        if (e.target === cropModal) {
+          closeCropModal();
+        }
+      });
+      
+      // Load available voices
+      async function loadVoices() {
+        try {
+          const voiceSelect = document.getElementById('agent-voice');
+          if (!voiceSelect) return;
+          
+          voiceSelect.innerHTML = '<option value="">Loading voices...</option>';
+          
+          const response = await fetch('/voices');
+          if (!response.ok) {
+            throw new Error(`Failed to fetch voices: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          // Clear the loading option
+          voiceSelect.innerHTML = '<option value="">Default Voice</option>';
+          
+          // Check if we have valid data
+          if (!data.results || !Array.isArray(data.results)) {
+            console.warn('Invalid voice data format:', data);
+            return;
+          }
+          
+          // Sort voices by name
+          const voices = data.results.sort((a, b) => a.name.localeCompare(b.name));
+          
+          // Add each voice as an option
+          voices.forEach(voice => {
+            const option = document.createElement('option');
+            option.value = voice.id;
+            option.textContent = voice.name;
+            voiceSelect.appendChild(option);
+          });
+          
+          console.log('Voices loaded successfully:', voices.length);
+        } catch (error) {
+          console.error('Error loading voices:', error);
+          const voiceSelect = document.getElementById('agent-voice');
+          if (voiceSelect) {
+            voiceSelect.innerHTML = '<option value="">Error loading voices</option>';
+          }
+        }
+      }
+      
+      // Load available corpora
+      async function loadCorpora() {
+        try {
+          const corpusSelect = document.getElementById('agent-corpus');
+          if (!corpusSelect) return;
+          
+          // Keep the default "No corpus" option
+          corpusSelect.innerHTML = '<option value="">No corpus (RAG disabled)</option><option disabled>Loading corpora...</option>';
+          
+          const response = await fetch('/list-corpora');
+          if (!response.ok) {
+            throw new Error(`Failed to fetch corpora: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          // Remove the loading option
+          corpusSelect.innerHTML = '<option value="">No corpus (RAG disabled)</option>';
+          
+          // Check if we have valid data
+          if (!data.corpora || !Array.isArray(data.corpora)) {
+            console.warn('Invalid corpora data format:', data);
+            return;
+          }
+          
+          // Sort corpora by name
+          const corpora = data.corpora.sort((a, b) => a.name.localeCompare(b.name));
+          
+          // Add each corpus as an option
+          corpora.forEach(corpus => {
+            const option = document.createElement('option');
+            option.value = corpus.id;
+            option.textContent = corpus.name;
+            corpusSelect.appendChild(option);
+          });
+          
+          console.log('Corpora loaded successfully:', corpora.length);
+        } catch (error) {
+          console.error('Error loading corpora:', error);
+          const corpusSelect = document.getElementById('agent-corpus');
+          if (corpusSelect) {
+            corpusSelect.innerHTML = '<option value="">No corpus (RAG disabled)</option><option disabled>Error loading corpora</option>';
+          }
+        }
+      }
+      
+      // Configuration tab switching
+      const configTabs = document.querySelectorAll('.config-tab');
+      const configContents = document.querySelectorAll('.config-content');
+      
+      configTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          const configType = this.getAttribute('data-config');
+          
+          // Update active tab
+          configTabs.forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Show active content
+          configContents.forEach(content => {
+            content.classList.remove('active');
+            if (content.id === `${configType}-config`) {
+              content.classList.add('active');
+            }
+          });
+          
+          // Update code samples
+          updateCodeSamples();
+        });
+      });
+      
+      // Function to generate a shareable URL from manual configuration
+      function generateShareableUrl() {
+        const baseUrl = window.location.origin + '/';
+        let shareableUrl = baseUrl + '?';
+        
+        // Get values from form fields
+        const voiceId = document.getElementById('agent-voice').value;
+        const agentName = document.getElementById('agent-name-manual').value;
+        const corpusId = document.getElementById('agent-corpus').value;
+        const systemPrompt = document.getElementById('agent-prompt').value;
+        
+        // Only add parameters that have values
+        if (voiceId && voiceId !== 'undefined' && voiceId !== '') {
+          shareableUrl += 'voice=' + encodeURIComponent(voiceId) + '&';
+        }
+        if (agentName) shareableUrl += 'agent=' + encodeURIComponent(agentName) + '&';
+        if (corpusId) shareableUrl += 'corpus=' + encodeURIComponent(corpusId) + '&';
+        if (systemPrompt) shareableUrl += 'prompt=' + encodeURIComponent(systemPrompt);
+        
+        // Remove trailing '&' if needed
+        if (shareableUrl.endsWith('&')) {
+          shareableUrl = shareableUrl.slice(0, -1);
+        }
+        
+        // If we only have the base URL with a question mark, remove the question mark
+        if (shareableUrl === baseUrl + '?') {
+          shareableUrl = baseUrl;
+        }
+        
+        return shareableUrl;
+      }
+      
+      // Function to update code samples
+      function updateCodeSamples() {
+        const activeConfig = document.querySelector('.config-tab.active').getAttribute('data-config');
+        
+        let shareableUrl;
+        
+        if (activeConfig === 'url') {
+          shareableUrl = document.getElementById('shareable-url').value || 'YOUR_SHAREABLE_URL_HERE';
+        } else {
+          shareableUrl = generateShareableUrl();
+        }
+        
+        const agentName = document.getElementById('agent-name').value;
+        const position = document.getElementById('position').value;
+        const theme = document.getElementById('theme').value;
+        
+        // Get avatar from either URL input or uploaded data
+        let avatarUrl = '';
+        const activeAvatarOption = document.querySelector('.avatar-option.active').getAttribute('data-option');
+        
+        if (activeAvatarOption === 'url') {
+          avatarUrl = document.getElementById('avatar-url').value;
+        } else {
+          // Use the data URL if available
+          avatarUrl = currentAvatarDataUrl || '';
+        }
+        
+        // Update one-line code - this is for generating an actual working embed script
+        let oneLineCode = `<script src="${window.location.origin}/widget/embed.js?url=${encodeURIComponent(shareableUrl)}`;
+        
+        if (avatarUrl) {
+          // For the actual embed code, we need to include the full base64 data
+          if (avatarUrl.startsWith('data:image')) {
+            // For display purposes only, show a placeholder in the UI
+            oneLineCodeElement.textContent = `<script src="${window.location.origin}/widget/embed.js?url=${encodeURIComponent(shareableUrl)}&avatar=[base64-encoded-image]&name=${agentName ? encodeURIComponent(agentName) : ''}&theme=${theme}&position=${position}"><\/script>`;
+            
+            // But the real code variable will have the full data URL
+            oneLineCode += `&avatar=${encodeURIComponent(avatarUrl)}`;
+          } else {
+            oneLineCode += `&avatar=${encodeURIComponent(avatarUrl)}`;
+          }
+        }
+        
+        if (agentName) oneLineCode += `&name=${encodeURIComponent(agentName)}`;
+        oneLineCode += `&theme=${theme}&position=${position}"><\/script>`;
+        
+        // Only update the display if we're not dealing with a data URL
+        if (!avatarUrl || !avatarUrl.startsWith('data:image')) {
+          oneLineCodeElement.textContent = oneLineCode;
+        }
+        
+        // Store the actual one-line code with the full avatar data for copying
+        oneLineCodeElement.dataset.fullCode = oneLineCode;
+        
+        // Update custom code - this is JUST for display purposes
+        let customCode = `<!-- Add the Voice Agent Widget script -->
+<script src="${window.location.origin}/widget/voice-agent-widget.js"><\/script>
+
+<!-- Create a container for the widget -->
+<div id="voice-agent-container"></div>
+
+<script>
+  // Initialize the widget
+  const voiceAgent = new VoiceAgentWidget({
+    agentUrl: '${shareableUrl}',`;
+        
+        // Create the display version and the full version separately
+        let customCodeWithBase64 = customCode;
+        
+        if (avatarUrl) {
+          // For display only: If it's a data URL, add a comment instead of the full string
+          if (avatarUrl.startsWith('data:image')) {
+            customCode += `
+    avatarUrl: /* base64-encoded avatar image */,`;
+            
+            // But include the full data URL in the version used for copying
+            customCodeWithBase64 += `
+    avatarUrl: '${avatarUrl}',`;
+          } else {
+            customCode += `
+    avatarUrl: '${avatarUrl}',`;
+            customCodeWithBase64 += `
+    avatarUrl: '${avatarUrl}',`;
+          }
+        }
+        
+        if (agentName) {
+          customCode += `
+    agentName: '${agentName}',`;
+          customCodeWithBase64 += `
+    agentName: '${agentName}',`;
+        }
+        
+        customCode += `
+    theme: '${theme}',
+    position: '${position}'
+  });
+  
+  // Mount the widget to the container
+  voiceAgent.mount('voice-agent-container');
+<\/script>`;
+
+        customCodeWithBase64 += `
+    theme: '${theme}',
+    position: '${position}'
+  });
+  
+  // Mount the widget to the container
+  voiceAgent.mount('voice-agent-container');
+<\/script>`;
+
+        // Set the display version
+        customCodeElement.textContent = customCode;
+        
+        // Store the full version for copying
+        customCodeElement.dataset.fullCode = customCodeWithBase64;
+      }
+      
+      // Create widget button click handler
+      createWidgetButton.addEventListener('click', async function() {
+        try {
+          // Disable the button during widget creation to prevent multiple clicks
+          createWidgetButton.disabled = true;
+          createWidgetButton.innerHTML = 'Creating Widget... <span class="loading-spinner"></span>';
+          
+          const activeConfig = document.querySelector('.config-tab.active').getAttribute('data-config');
+          
+          let agentUrl;
+          
+          if (activeConfig === 'url') {
+            agentUrl = document.getElementById('shareable-url').value;
+            if (!agentUrl) {
+              alert('Please enter a shareable URL');
+              return;
+            }
+          } else {
+            // For manual configuration
+            const voiceSelect = document.getElementById('agent-voice');
+            const voiceId = voiceSelect.value;
+            
+            // If voices aren't loaded yet, load them
+            if (voiceSelect.options.length <= 1) {
+              await loadVoices();
+            }
+            
+            // Generate the URL based on the form data
+            agentUrl = generateShareableUrl();
+            
+            // Make sure the voice parameter isn't set to 'undefined'
+            if (agentUrl.includes('voice=undefined')) {
+              agentUrl = agentUrl.replace('voice=undefined&', '');
+              agentUrl = agentUrl.replace('voice=undefined', '');
+              // Clean up any trailing ? or & characters
+              agentUrl = agentUrl.replace(/[?&]$/, '');
+              // Ensure proper ? is present if needed
+              if (agentUrl.includes('&') && !agentUrl.includes('?')) {
+                agentUrl = agentUrl.replace('&', '?');
+              }
+            }
+          }
+          
+          const agentName = document.getElementById('agent-name').value;
+          const position = document.getElementById('position').value;
+          const theme = document.getElementById('theme').value;
+          
+          // Get avatar from either URL input or uploaded data
+          let avatarUrl = '';
+          const activeAvatarOption = document.querySelector('.avatar-option.active').getAttribute('data-option');
+          
+          if (activeAvatarOption === 'url') {
+            avatarUrl = document.getElementById('avatar-url').value;
+          } else {
+            // Use the data URL if available
+            avatarUrl = currentAvatarDataUrl || '';
+          }
+          
+          // Remove any existing widget
+          const container = document.getElementById('widget-container');
+          container.innerHTML = '';
+          
+          // Create configuration object
+          const config = {
+            agentUrl: agentUrl,
+            position: position,
+            theme: theme
+          };
+          
+          // Add optional parameters if provided
+          if (avatarUrl) config.avatarUrl = avatarUrl;
+          if (agentName) config.agentName = agentName;
+          
+          // Instead of creating a widget instance, use an iframe to load frame.html
+          // Build the query parameters for the iframe src
+          let iframeSrc = 'frame.html?';
+          if (agentUrl) iframeSrc += `url=${encodeURIComponent(agentUrl)}`;
+          if (avatarUrl) iframeSrc += `&avatar=${encodeURIComponent(avatarUrl)}`;
+          if (agentName) iframeSrc += `&name=${encodeURIComponent(agentName)}`;
+          iframeSrc += `&theme=${theme}&position=${position}&collapsed=true&minimized=true`;
+          
+          // Create and append the iframe
+          const iframe = document.createElement('iframe');
+          iframe.src = iframeSrc;
+          iframe.style.width = '100%';
+          iframe.style.height = '500px';
+          iframe.style.border = '1px solid #ddd';
+          iframe.style.borderRadius = '8px';
+          iframe.style.backgroundColor = theme === 'dark' ? '#333' : '#f9f9f9';
+          
+          container.appendChild(iframe);
+          
+          // Store reference to iframe for reset button
+          widgetInstance = iframe;
+          
+          // Listen for iframe ready message
+          window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'iframe_loaded') {
+              console.log('Iframe is ready', event.data);
+            }
+          });
+          
+          // Update code samples
+          updateCodeSamples();
+          
+          // Log the actual URL for debugging
+          console.log('Widget created with URL:', agentUrl);
+          if (avatarUrl) console.log('Avatar URL first 100 chars:', avatarUrl.substring(0, 100) + '...');
+        } catch (error) {
+          console.error('Error creating widget:', error);
+          alert('Failed to create widget: ' + error.message);
+        } finally {
+          // Re-enable the button
+          createWidgetButton.disabled = false;
+          createWidgetButton.textContent = 'Create Widget';
+        }
+      });
+      
+      // Reset widget button click handler
+      resetWidgetButton.addEventListener('click', function() {
+        const container = document.getElementById('widget-container');
+        container.innerHTML = '';
+        widgetInstance = null;
+        
+        // Show a message in the container
+        const message = document.createElement('div');
+        message.style.padding = '20px';
+        message.style.textAlign = 'center';
+        message.style.color = '#666';
+        message.innerHTML = 'Widget has been reset.<br>Click "Create Widget" to create a new widget preview.';
+        container.appendChild(message);
+        
+        // Reset the toggle button text
+        const toggleButton = document.getElementById('toggle-widget');
+        if (toggleButton) {
+          toggleButton.textContent = 'Expand Widget';
+          isWidgetExpanded = false;
+        }
+      });
+      
+      // Toggle widget expand/collapse button handler
+      const toggleWidgetButton = document.getElementById('toggle-widget');
+      if (toggleWidgetButton) {
+        toggleWidgetButton.addEventListener('click', function() {
+          if (!widgetInstance || !(widgetInstance instanceof HTMLIFrameElement)) {
+            alert('Please create a widget first');
+            return;
+          }
+          
+          try {
+            if (isWidgetExpanded) {
+              // Send a message to collapse the widget
+              widgetInstance.contentWindow.postMessage({ type: 'minimize' }, '*');
+              this.textContent = 'Expand Widget';
+            } else {
+              // Send a message to expand the widget
+              widgetInstance.contentWindow.postMessage({ type: 'expand' }, '*');
+              this.textContent = 'Collapse Widget';
+            }
+            
+            isWidgetExpanded = !isWidgetExpanded;
+          } catch (error) {
+            console.error('Error toggling widget:', error);
+            alert('Failed to toggle widget state: ' + error.message);
+          }
+        });
+      }
+      
+      // Refresh data button click handler
+      refreshDataButton.addEventListener('click', function() {
+        this.disabled = true;
+        this.innerHTML = 'Refreshing... <span class="loading-spinner"></span>';
+        
+        Promise.all([loadVoices(), loadCorpora()])
+          .finally(() => {
+            this.disabled = false;
+            this.textContent = 'Refresh Voices & Corpora';
+          });
+      });
+      
+      // Update code samples when form fields change
+      ['shareable-url', 'agent-name', 'avatar-url', 'position', 'theme', 
+       'agent-voice', 'agent-corpus', 'agent-name-manual', 'agent-prompt'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.addEventListener('input', updateCodeSamples);
+          element.addEventListener('change', updateCodeSamples);
+        }
+      });
+      
+      // Load voices and corpora on page load
+      loadVoices();
+      loadCorpora();
+      
+      // Initialize code samples
+      updateCodeSamples();
+    });
+  </script>
+</body>
+</html> 

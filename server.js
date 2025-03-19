@@ -12,14 +12,117 @@ import { WebSocketServer } from 'ws';
 import fileUpload from 'express-fileupload';
 import FormData from 'form-data';
 import fs from 'fs';
+import { 
+  getAvailableTimeSlots as getGoogleAvailableTimeSlots, 
+  groupAvailableSlotsByDay, 
+  formatAvailabilityForVoice, 
+  createCalendarEvent as createGoogleCalendarEvent 
+} from './utils/google-calendar.js';
+import {
+  getAvailableTimeSlots as getMicrosoftAvailableTimeSlots,
+  createCalendarEvent as createMicrosoftCalendarEvent
+} from './utils/microsoft-calendar.js';
+import cors from 'cors';
+import session from 'express-session';
+import bodyParser from 'body-parser';
+import multer from 'multer';
+
+// Load additional environment files
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.calendar' });
+dotenv.config({ path: '.env.tools' });
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables
+dotenv.config();
+
+// Create Express app
 const app = express();
+const server = http.createServer(app);
+
+// Add CORS middleware to support remote embedding
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*'); // Allow any origin
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send();
+  }
+  
+  next();
+});
+
+// Add special CORS headers for SDK files
+app.use('/ultravox-sdk', (req, res, next) => {
+  // Ensure SDK files can be loaded from any domain
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cross-Origin-Embedder-Policy', 'credentialless');
+  
+  // Set the correct MIME type for JavaScript modules
+  if (req.path.endsWith('.js') || req.path.endsWith('.mjs')) {
+    res.header('Content-Type', 'application/javascript');
+  } else if (req.path.endsWith('.json')) {
+    res.header('Content-Type', 'application/json');
+  }
+  
+  next();
+});
+
+// Add special route to handle cross-origin SDK imports via proxy
+app.get('/sdk-proxy/esm/:filename', async (req, res) => {
+  try {
+    // This route lets you proxy requests to the SDK
+    const filePath = `/ultravox-sdk/esm/${req.params.filename}`;
+    
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Content-Type', 'application/javascript');
+    
+    // Serve the file by routing through the middleware
+    req.url = filePath;
+    res.sendFile(path.join(__dirname, 'public', filePath));
+  } catch (error) {
+    console.error('Error serving SDK proxy file:', error);
+    res.status(500).send('Error serving SDK file');
+  }
+});
+
+// Add special route to handle cross-origin UMD imports via proxy
+app.get('/sdk-proxy/umd/:filename', async (req, res) => {
+  try {
+    // This route lets you proxy requests to the SDK
+    const filePath = `/ultravox-sdk/umd/${req.params.filename}`;
+    
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Content-Type', 'application/javascript');
+    
+    // Serve the file
+    res.sendFile(path.join(__dirname, 'public', filePath));
+  } catch (error) {
+    console.error('Error serving SDK proxy file:', error);
+    res.status(500).send('Error serving SDK file');
+  }
+});
+
+// Set up middleware for parsing requests
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Enable CORS for all routes - essential for remote widget embedding
+app.use(cors({
+  origin: '*', // Allow any origin to embed the widget
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-API-Key', 'X-Requested-With', 'Accept', 'Origin'],
+  credentials: true
+}));
 
 const DEBUG = false; // Set to false to disable logging
 
@@ -69,23 +172,35 @@ app.use((req, res, next) => {
 
 // Configuration for file upload middleware
 app.use(fileUpload({
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max file size
-    abortOnLimit: true,
-    debug: false,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max file size
     useTempFiles: true,
-    tempFileDir: '/tmp/',
-    createParentPath: true,
-    safeFileNames: true,
-    preserveExtension: true,
-    parseNested: true,
-    uploadTimeout: 60000,
-    // Add more options to capture and debug raw request
-    keepExtensions: true,
-    createParentPath: true
+    tempFileDir: '/tmp/'
 }));
 
 // Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, path, stat) => {
+        // Set proper MIME types for JavaScript files
+        if (path.endsWith('.js')) {
+            res.set('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.mjs')) {
+            res.set('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.json')) {
+            res.set('Content-Type', 'application/json');
+        }
+    }
+}));
+
+// Explicitly serve files from public/node_modules with proper MIME types
+app.use('/node_modules', express.static(path.join(__dirname, 'public/node_modules'), {
+    setHeaders: (res, path, stat) => {
+        if (path.endsWith('.js') || path.endsWith('.mjs')) {
+            res.set('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.json')) {
+            res.set('Content-Type', 'application/json');
+        }
+    }
+}));
 
 // Configuration from environment variables
 const PORT = process.env.PORT || 3000;
@@ -119,7 +234,7 @@ const AI_TEMPERATURE = parseFloat(process.env.AI_TEMPERATURE) || 0.3;
 const OUTBOUND_FIRST_SPEAKER = process.env.OUTBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_USER';
 const INBOUND_FIRST_SPEAKER = process.env.INBOUND_FIRST_SPEAKER || 'FIRST_SPEAKER_AGENT';
 // Use a static preprompt instead of reading from env
-const AGENT_PREPROMPT = "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets like [nervous laugh], [pauses], [thinking], etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. Please strictly adhere to the following prompt:";
+const AGENT_PREPROMPT = process.env.AGENT_PREPROMPT || "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets or asterisk like [nervous laugh], [pauses], *thinking*, etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. CRITICAL: You MUST begin your conversation by acknowledging the user's current local time that is provided to you with an appropriate greeting (e.g., 'Good morning! It's 11:45 AM where you are.'). :";
 // Process system prompt by replacing variables
 function processSystemPrompt(prompt, agentName) {
     // Use the provided agent name or fall back to the default AI_NAME
@@ -136,12 +251,65 @@ function processSystemPrompt(prompt, agentName) {
 }
 
 // Get appropriate system prompt based on call type
-function getSystemPrompt(isOutbound = false, agentName = null) {
-    let prompt = isOutbound ? 
-        process.env.OUTBOUND_SYSTEM_PROMPT :
-        process.env.INBOUND_SYSTEM_PROMPT;
+function getSystemPrompt(isOutbound = false, agentName = null, userEmail = null, userLocalTimeString = null, userTimeZone = null) {
+    // Base prompt
+    let prompt = process.env.SYSTEM_PROMPT || '';
     
-    // Add tool information to the prompt if tools are enabled
+    // Add outbound-specific instructions if needed
+    if (isOutbound) {
+        prompt = process.env.OUTBOUND_SYSTEM_PROMPT || prompt;
+    }
+    
+    // Add user's local time information if available
+    if (userLocalTimeString && userTimeZone && process.env.ULTRAVOX_USE_TIME_GREETING !== 'false') {
+        // Make time information extremely prominent at the beginning of the prompt
+        prompt = `CRITICAL INSTRUCTION: The user's current local time is "${userLocalTimeString}" in the ${userTimeZone} timezone. You MUST acknowledge this exact time in your very first sentence with an appropriate greeting (Good morning/afternoon/evening).\n\n${prompt}`;
+    }
+    
+    // Add calendar scheduling capabilities
+    const calendarOwner = process.env.CALENDAR_OWNER ? `for ${process.env.CALENDAR_OWNER}` : '';
+    
+    // Use calendar prompt from environment if available
+    if (process.env.CALENDAR_PROMPT) {
+        let calendarPrompt = process.env.CALENDAR_PROMPT;
+        // Replace placeholders
+        calendarPrompt = calendarPrompt.replace(/{CALENDAR_OWNER}/g, process.env.CALENDAR_OWNER || 'AI Assistant');
+        prompt += `\n\n${calendarPrompt}`;
+    } else {
+        // Fallback to hardcoded prompt
+        prompt += `\n\nYou are also a scheduling assistant${calendarOwner}. You can check calendar availability and schedule appointments. 
+When a user asks about scheduling a meeting or call:
+1. ${process.env.CALENDAR_OWNER ? `Explain that you're helping schedule a call with ${process.env.CALENDAR_OWNER}` : 'Ask what the meeting is about'}
+2. Ask them what day or time range they're interested in
+3. Use the calendar tool to check availability
+4. Offer available time slots, grouping by morning, afternoon, or evening
+5. Once they select a time, use the calendar-schedule tool to create the appointment
+6. Confirm the details and let them know the appointment has been scheduled
+7. Be conversational and helpful throughout the process
+
+Remember to use the calendar tool when users ask about scheduling or availability.
+When a user selects a specific time, use the calendar-schedule tool to create the appointment with the following parameters:
+- startTime: The ISO date and time for the start of the appointment (e.g., "2025-03-20T10:00:00-07:00")
+- endTime: The ISO date and time for the end of the appointment (exactly 30 minutes after startTime)
+- summary: A brief title for the appointment (e.g., "Call with ${process.env.CALENDAR_OWNER || 'AI Assistant'}")
+- description: Optional details about the appointment
+- attendees: Array of email addresses for attendees`;
+    }
+
+    // Add user email to attendees if provided
+    if (process.env.EMAIL_PROMPT) {
+        let emailPrompt = process.env.EMAIL_PROMPT;
+        
+        // Replace the user email placeholder if available
+        if (userEmail) {
+            emailPrompt = emailPrompt.replace(/{USER_EMAIL}/g, userEmail);
+        }
+        
+        // Don't add email prompt as it's being moved to a separate landing page
+        // prompt += `\n\n${emailPrompt}`;
+    }
+    
+    // Add tool information if tools are enabled
     const toolNames = (process.env.ULTRAVOX_CALL_TOOLS || '').split(',').filter(Boolean);
     const useTools = process.env.ULTRAVOX_USE_TOOLS === 'true' || toolNames.length > 0;
     
@@ -238,19 +406,129 @@ async function createUltravoxCall(options = {}) {
         corpusId: overrideCorpusId,
         toolNames,
         agentName,
+        userEmail,
+        userLocalTimeString,
+        userTimeZone,
         medium
     } = options;
 
+    console.log('createUltravoxCall received systemPrompt:', systemPrompt ? {
+        length: systemPrompt.length,
+        preview: systemPrompt.substring(0, 50) + '...'
+    } : 'not provided');
+    
+    console.log('createUltravoxCall received agentName:', agentName || 'not provided');
+
+    // Log more details about the systemPrompt for debugging
+    if (systemPrompt) {
+        console.log('DETAILED PROMPT DEBUG:');
+        console.log('PROMPT TYPE:', typeof systemPrompt);
+        console.log('PROMPT LENGTH:', systemPrompt.length);
+        console.log('PROMPT FIRST 100 CHARS:', systemPrompt.substring(0, 100));
+        console.log('PROMPT LAST 100 CHARS:', systemPrompt.substring(systemPrompt.length - 100));
+        console.log('PROMPT CONTAINS SPECIAL CHARS:', /[^\x20-\x7E]/.test(systemPrompt));
+    } else {
+        console.log('DETAILED PROMPT DEBUG: No system prompt provided to createUltravoxCall');
+    }
+
+    // Get current time for the system prompt
+    const now = new Date();
+    const hour = now.getHours();
+    const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+    const timezone = userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+    
+    // Format time with day of week and date in a clean format
+    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
+    const dateString = now.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: timezone 
+    });
+    
+    // Format time manually to ensure no seconds
+    const hour12 = hour % 12 || 12;
+    const minutes = now.getMinutes();
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    
+    // Create time string in format like "three pm" or "three thirty pm"
+    let timeString;
+    if (minutes === 0) {
+        timeString = `${hour12} ${ampm.toLowerCase()}`;
+    } else {
+        timeString = `${hour12} ${minutes < 10 ? 'oh' : ''} ${minutes} ${ampm.toLowerCase()}`;
+    }
+    
+    // Combine into a clean format
+    const exactTimeString = userLocalTimeString || timeString;
+    
+    // Add time instruction at the very beginning - with date and timezone
+    let timeInstruction = '';
+    if (process.env.ULTRAVOX_USE_TIME_GREETING !== 'false') {
+        const timeGreetingMessage = process.env.ULTRAVOX_TIME_GREETING_MESSAGE || "Hello, it's {timeString}, {dayOfWeek} {timeOfDay}.";
+        timeInstruction = timeGreetingMessage
+            .replace('{timeString}', timeString)
+            .replace('{dayOfWeek}', dayOfWeek)
+            .replace('{timeOfDay}', timeOfDay) + "\n\n";
+    }
+
+    // Get the appropriate system prompt based on call type
+    const basePrompt = isOutbound ? 
+        process.env.OUTBOUND_SYSTEM_PROMPT : 
+        process.env.INBOUND_SYSTEM_PROMPT;
+    
+    // First, check if we have a user-provided prompt
+    let processedPrompt;
+    if (systemPrompt) {
+        // IMPORTANT FIX: Always process the prompt with the agent name, even if user-provided
+        processedPrompt = processSystemPrompt(systemPrompt, agentName);
+        console.log('Applied agent name to user-provided prompt:', {
+            agentName: agentName || AI_NAME,
+            originalLength: systemPrompt.length,
+            processedLength: processedPrompt.length
+        });
+    } else {
+        // Get the final system prompt with all enhancements for auto-generated prompts
+        processedPrompt = getSystemPrompt(isOutbound, agentName || AI_NAME, userEmail, userLocalTimeString, userTimeZone);
+    }
+    
+    // For auto-generated prompts, add the time instruction
+    const combinedPrompt = systemPrompt ? 
+        processedPrompt : // Use the processed user prompt without time instruction
+        (basePrompt ? 
+            `${timeInstruction}Your name is ${agentName || AI_NAME} and you are ${basePrompt.replace(/{AGENT_NAME}/g, agentName || AI_NAME)}` : 
+            `${timeInstruction}${processedPrompt}`);
+
+    // Add stronger emphasis on proactive tool usage, but only for auto-generated prompts (not user-provided ones)
+    const enhancedPrompt = systemPrompt ? 
+        processedPrompt : // Keep processed user prompt as is
+        `${combinedPrompt}\n\nCRITICAL INSTRUCTION: You MUST use your tools PROACTIVELY without waiting to be asked. Specifically:
+1. When ANY conversation about scheduling, availability, or meetings occurs, IMMEDIATELY use the calendar tool to check availability WITHOUT SAYING "let me check the calendar" first
+2. ALWAYS check and quote available time slots BEFORE scheduling any meeting - never schedule without first checking availability
+3. When showing available times, group them by morning (9am-12pm), afternoon (12pm-5pm), and evening (5pm-8pm)
+4. Only use the calendar-schedule tool AFTER you've checked availability and the user has selected a specific time
+5. NEVER wait for the user to explicitly ask you to check the calendar or schedule something
+6. Take initiative in the conversation - if the user mentions anything about meeting or talking later, proactively offer to schedule it
+7. NEVER announce that you're about to use a tool - just use it and then respond with the results
+8. DO NOT say phrases like "Let me check that for you" or "Let me look that up" - just immediately use the appropriate tool
+9. For the hangUp tool, use it when the conversation has reached a natural conclusion
+10. ALWAYS confirm meeting details after scheduling by saying something like "Great! I've scheduled your meeting with Half for [day] at [time]. You'll receive a calendar invitation shortly."
+11. When confirming meetings, be specific about the exact day and time that was scheduled`;
+    
+    console.log('Final prompt after processing:', enhancedPrompt ? {
+        length: enhancedPrompt.length,
+        preview: enhancedPrompt.substring(0, 50) + '...',
+        isSystemPromptProvided: !!systemPrompt
+    } : 'empty prompt');
+    
     // Create base call config
     const callConfig = {
-        systemPrompt: systemPrompt ? 
-            processSystemPrompt(systemPrompt, agentName) : 
-            getSystemPrompt(isOutbound, agentName),
-        model: 'fixie-ai/ultravox-70B',  // Ensure we use 70B model which handles tools better
+        systemPrompt: enhancedPrompt,
+        model: 'fixie-ai/ultravox-70B',
         voice: voiceId || AI_VOICE,
         temperature: AI_TEMPERATURE,
         firstSpeaker: isOutbound ? OUTBOUND_FIRST_SPEAKER : INBOUND_FIRST_SPEAKER,
-        medium: medium || { "twilio": {} }, // Use provided medium or default to twilio
+        medium: medium || { "twilio": {} },
         recordingEnabled: true,
         selectedTools: []
     };
@@ -271,11 +549,6 @@ async function createUltravoxCall(options = {}) {
         if (tools.length > 0) {
             callConfig.selectedTools = callConfig.selectedTools.concat(tools);
             console.info(`Configured ${tools.length} tools for ${isOutbound ? 'outbound' : 'inbound'} call.`);
-            
-            // Enhance the system prompt with tool information if guidelines exist
-            if (process.env.ULTRAVOX_TOOL_GUIDELINES) {
-                callConfig.systemPrompt = enhancePromptWithToolInfo(callConfig.systemPrompt, toolNames);
-            }
         }
     } else {
         console.info('Optional tools disabled for this call');
@@ -321,12 +594,13 @@ Important: You have access to several tools that enhance your capabilities. Alwa
 2. Format the information naturally in your responses
 3. Don't mention that you're using a tool - just provide the information
 4. If a tool call fails, gracefully inform the user you're unable to get that information right now
-5. For the hangUp tool, only use it when the user requests to end the call or the conversation has reached a natural conclusion
+5. For the hangUp tool, PROACTIVELY use it when the user requests to end the call or the conversation has reached a natural conclusion - don't wait for explicit instructions to use the tool
 6. Before using hangUp, always say "Alrighty, goodbye.." followed by a brief summary or closing statement to the user
+7. IMMEDIATELY use the hangUp tool after saying goodbye, without waiting for further user input
 `;
     }
 
-    console.log('Final call configuration:', JSON.stringify(callConfig, null, 2));
+    console.log('Sending request to Ultravox API:', JSON.stringify(callConfig, null, 2));
 
     return new Promise((resolve, reject) => {
         // Create HTTPS request
@@ -1474,26 +1748,67 @@ app.get('/test-telnyx', async (req, res) => {
 // Add endpoint to get join URL for WebRTC call
 app.post('/webrtc-join-url', async (req, res) => {
     try {
+        console.log('Raw request body:', req.body);
+        
         const { 
             voiceId, 
             corpusId, 
             agentName, 
-            systemPrompt 
+            systemPrompt,
+            userEmail,
+            userLocalTimeString,
+            userTimeZone,
+            // Extract additional time context fields
+            timeOfDay,
+            dayOfWeek,
+            dateString,
+            exactTimeString,
+            hour
         } = req.body;
         
         console.log('Received WebRTC join URL request:', {
             voiceId,
             corpusId,
-            agentName,
-            systemPrompt: systemPrompt ? 'provided' : 'not provided'
+            agentName: agentName || '(not provided)',
+            systemPromptDetails: systemPrompt ? {
+                length: systemPrompt.length,
+                firstChars: systemPrompt.substring(0, 50) + '...'
+            } : '(not provided)',
+            userEmail: userEmail ? 'provided' : 'not provided',
+            userLocalTimeString: userLocalTimeString || 'not provided',
+            userTimeZone: userTimeZone || 'not provided',
+            timeOfDay: timeOfDay || 'morning',
+            dayOfWeek: dayOfWeek || 'Monday',
+            dateString: dateString || 'March 1, 2025',
+            exactTimeString: exactTimeString || '11:45 AM',
+            hour: hour || 11
         });
+
+        // Add more detailed prompt debugging
+        if (systemPrompt) {
+            console.log('PROMPT DEBUG - received prompt details:');
+            console.log('PROMPT DEBUG - length:', systemPrompt.length);
+            console.log('PROMPT DEBUG - first 200 chars:', systemPrompt.substring(0, 200));
+            console.log('PROMPT DEBUG - full prompt:', systemPrompt);
+        } else {
+            console.log('PROMPT DEBUG - NO SYSTEM PROMPT PROVIDED IN REQUEST');
+        }
         
-        // Create Ultravox call with WebRTC medium
+        // Create Ultravox call with WebRTC medium and all time parameters
         const response = await createUltravoxCall({
             systemPrompt,
             voiceId,
             corpusId,
             agentName,
+            userEmail,
+            userLocalTimeString,
+            userTimeZone,
+            // Pass all additional time context from the widget
+            timeOfDay,
+            dayOfWeek,
+            dateString,
+            exactTimeString,
+            hour,
             // Specific options for WebRTC
             medium: { "webRtc": {} }
         });
@@ -1504,9 +1819,25 @@ app.post('/webrtc-join-url', async (req, res) => {
         
         console.log('Created WebRTC call with join URL');
         
+        // Generate a shareable URL for widget integration
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const widgetPageUrl = `${baseUrl}/widget/`;
+        const shareableUrl = `${baseUrl}/?`;
+        let shareableParams = [];
+        
+        if (voiceId) shareableParams.push(`voice=${encodeURIComponent(voiceId)}`);
+        if (agentName) shareableParams.push(`agent=${encodeURIComponent(agentName)}`);
+        if (corpusId) shareableParams.push(`corpus=${encodeURIComponent(corpusId)}`);
+        if (systemPrompt) shareableParams.push(`prompt=${encodeURIComponent(systemPrompt)}`);
+        
+        const fullShareableUrl = shareableUrl + shareableParams.join('&');
+        
         res.json({
             success: true,
-            joinUrl: response.joinUrl
+            joinUrl: response.joinUrl,
+            widgetUrl: widgetPageUrl,
+            shareableUrl: fullShareableUrl,
+            widgetIntegrationNote: "You can now integrate this voice agent on your website using our widget. Visit the widget page for instructions."
         });
         
     } catch (error) {
@@ -1524,9 +1855,6 @@ app.use('/ultravox-sdk', express.static(path.join(__dirname, 'public/ultravox-sd
 
 // Setup WebSocket server for Telnyx media streaming
 // Create an HTTP server
-const server = http.createServer(app);
-
-// Create a WebSocket server using the HTTP server
 const wss = new WebSocketServer({ 
     server,
     path: '/stream-ws'
@@ -1705,6 +2033,514 @@ wss.on('connection', (ws, req) => {
     }
 });
 
+// Add a route to serve the system prompt
+app.get('/system-prompt', (req, res) => {
+    const promptType = req.query.type || 'inbound';
+    let prompt;
+    
+    if (promptType === 'inbound') {
+        prompt = process.env.INBOUND_SYSTEM_PROMPT;
+    } else if (promptType === 'outbound') {
+        prompt = process.env.OUTBOUND_SYSTEM_PROMPT;
+    } else {
+        return res.status(400).json({ error: 'Invalid prompt type' });
+    }
+    
+    res.json({ prompt });
+});
+
+// Calendar API proxy endpoints
+app.get('/api/calendar/availability', async (req, res) => {
+  try {
+    console.time('calendar-availability');
+    console.log('Proxying calendar availability request');
+    
+    // Get date range from query params or use default (next 7 days)
+    const startDate = req.query.startDate 
+      ? new Date(req.query.startDate) 
+      : new Date();
+    
+    let endDate = req.query.endDate 
+      ? new Date(req.query.endDate) 
+      : new Date();
+    
+    // If no end date provided, set to 7 days from start
+    if (!req.query.endDate) {
+      endDate.setDate(startDate.getDate() + 7);
+    }
+    
+    // Create a cache key based on the request parameters
+    const calendarProvider = req.query.provider || process.env.DEFAULT_CALENDAR_PROVIDER || 'google';
+    const cacheKey = `availability_${calendarProvider}_${startDate.toISOString()}_${endDate.toISOString()}`;
+    
+    // Check if we have a cached response
+    if (global.calendarResponseCache && global.calendarResponseCache.has(cacheKey)) {
+      console.log('Using cached calendar response');
+      console.timeEnd('calendar-availability');
+      return res.json(global.calendarResponseCache.get(cacheKey));
+    }
+    
+    console.log(`Checking availability from ${startDate.toISOString()} to ${endDate.toISOString()} using ${calendarProvider}`);
+    
+    // Get meeting duration from query params or use default (30 minutes)
+    const durationMinutes = parseInt(req.query.duration || 30);
+    
+    // Get available time slots based on the provider
+    let availableSlots;
+    if (calendarProvider.toLowerCase() === 'microsoft') {
+      availableSlots = await getMicrosoftAvailableTimeSlots(startDate, endDate, durationMinutes);
+    } else {
+      // Default to Google Calendar
+      availableSlots = await getGoogleAvailableTimeSlots(startDate, endDate, durationMinutes);
+    }
+    
+    console.log(`Found ${availableSlots.length} available time slots`);
+    
+    // Group slots by day and time of day
+    const groupedSlots = groupAvailableSlotsByDay(availableSlots);
+    
+    // Format for voice response
+    const formattedAvailability = formatAvailabilityForVoice(groupedSlots);
+    
+    // Format times in Eastern Time for display
+    const formatTimeInET = (isoString) => {
+      const date = new Date(isoString);
+      
+      // Get hour and minute components
+      const etDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const hour = etDate.getHours() % 12 || 12; // Convert to 12-hour format
+      const minute = etDate.getMinutes();
+      const ampm = etDate.getHours() >= 12 ? 'PM' : 'AM';
+      
+      // Format time in a voice-friendly way
+      let formattedTime;
+      if (minute === 0) {
+        // For times on the hour, use "9AM" format (no space)
+        formattedTime = `${hour}${ampm}`;
+      } else if (minute === 30) {
+        // For half hours, use "9:30AM" format (no space)
+        formattedTime = `${hour}:30${ampm}`;
+      } else {
+        // For other times, use standard format with no space
+        formattedTime = `${hour}:${minute.toString().padStart(2, '0')}${ampm}`;
+      }
+      
+      // Format the date part separately
+      const dateOptions = {
+        timeZone: 'America/New_York',
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      };
+      
+      const datePart = date.toLocaleDateString('en-US', dateOptions);
+      
+      return `${datePart} at ${formattedTime}`;
+    };
+    
+    // Add formatted times to each slot and ensure formattedDate is correct
+    for (const day in formattedAvailability.availableDays) {
+      const dayData = formattedAvailability.availableDays[day];
+      
+      // Fix the formatted date by using the first slot's date
+      if (dayData.slots.morning.length > 0) {
+        const firstSlot = dayData.slots.morning[0];
+        const slotDate = new Date(firstSlot.start);
+        const dateOptions = {
+          timeZone: 'America/New_York',
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric'
+        };
+        dayData.formattedDate = slotDate.toLocaleDateString('en-US', dateOptions);
+      } else if (dayData.slots.afternoon.length > 0) {
+        const firstSlot = dayData.slots.afternoon[0];
+        const slotDate = new Date(firstSlot.start);
+        const dateOptions = {
+          timeZone: 'America/New_York',
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric'
+        };
+        dayData.formattedDate = slotDate.toLocaleDateString('en-US', dateOptions);
+      } else if (dayData.slots.evening.length > 0) {
+        const firstSlot = dayData.slots.evening[0];
+        const slotDate = new Date(firstSlot.start);
+        const dateOptions = {
+          timeZone: 'America/New_York',
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric'
+        };
+        dayData.formattedDate = slotDate.toLocaleDateString('en-US', dateOptions);
+      }
+      
+      // Format times for each slot
+      for (const timeOfDay in dayData.slots) {
+        const slots = dayData.slots[timeOfDay];
+        for (const slot of slots) {
+          slot.formattedStartTime = formatTimeInET(slot.start);
+          slot.formattedEndTime = formatTimeInET(slot.end);
+        }
+      }
+    }
+    
+    // Generate availability text with the corrected formatted dates
+    let availabilityText = "I'm available on ";
+    
+    // Get the available days
+    const availableDays = formattedAvailability.availableDays;
+    const dayKeys = Object.keys(availableDays);
+    
+    if (dayKeys.length === 0) {
+      availabilityText = "I don't have any availability in the requested time range.";
+    } else if (dayKeys.length === 1) {
+      // Only one day available
+      const day = availableDays[dayKeys[0]];
+      availabilityText += `${day.formattedDate} in the `;
+      
+      // Add time of day
+      const timeOfDay = day.timeOfDayAvailable;
+      if (timeOfDay.length === 1) {
+        availabilityText += `${timeOfDay[0]}`;
+      } else if (timeOfDay.length === 2) {
+        availabilityText += `${timeOfDay[0]} and ${timeOfDay[1]}`;
+      } else if (timeOfDay.length === 3) {
+        availabilityText += `${timeOfDay[0]}, ${timeOfDay[1]}, and ${timeOfDay[2]}`;
+      }
+      
+      // Add specific times
+      availabilityText += ". Specifically, I'm free at ";
+      
+      // Collect all times from this day
+      const allTimes = [];
+      for (const tod of timeOfDay) {
+        const slots = day.slots[tod];
+        for (const slot of slots) {
+          // Extract just the time part from the formatted time
+          const timePart = slot.formattedStartTime.split(' at ')[1];
+          allTimes.push(timePart);
+        }
+      }
+      
+      // Format the times
+      if (allTimes.length === 1) {
+        availabilityText += allTimes[0];
+      } else if (allTimes.length === 2) {
+        availabilityText += `${allTimes[0]} and ${allTimes[1]}`;
+      } else {
+        const lastTime = allTimes.pop();
+        availabilityText += `${allTimes.join(', ')}, and ${lastTime}`;
+      }
+    } else {
+      // Multiple days available
+      const formattedDays = dayKeys.map((key, index) => {
+        const day = availableDays[key];
+        let dayText = day.formattedDate;
+        
+        // Add time of day
+        const timeOfDay = day.timeOfDayAvailable;
+        if (timeOfDay.length === 1) {
+          dayText += ` in the ${timeOfDay[0]}`;
+        } else if (timeOfDay.length === 2) {
+          dayText += ` in the ${timeOfDay[0]} and ${timeOfDay[1]}`;
+        } else if (timeOfDay.length === 3) {
+          dayText += ` in the ${timeOfDay[0]}, ${timeOfDay[1]}, and ${timeOfDay[2]}`;
+        }
+        
+        return dayText;
+      });
+      
+      if (formattedDays.length === 2) {
+        availabilityText += `${formattedDays[0]} and ${formattedDays[1]}`;
+      } else {
+        const lastDay = formattedDays.pop();
+        availabilityText += `${formattedDays.join(', ')}, and ${lastDay}`;
+      }
+    }
+    
+    // Update the availability text
+    formattedAvailability.availabilityText = availabilityText;
+    
+    // Cache the response
+    if (!global.calendarResponseCache) {
+      global.calendarResponseCache = new Map();
+    }
+    global.calendarResponseCache.set(cacheKey, formattedAvailability);
+    
+    console.timeEnd('calendar-availability');
+    res.json(formattedAvailability);
+  } catch (error) {
+    console.error('Error getting calendar availability:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.post('/api/calendar/schedule', async (req, res) => {
+  try {
+    console.log('Proxying calendar scheduling request');
+    
+    // Get required parameters from request body
+    let { startTime, endTime, summary, description, attendees } = req.body;
+    
+    // Get calendar provider from query params or use default
+    const calendarProvider = req.query.provider || process.env.DEFAULT_CALENDAR_PROVIDER || 'google';
+    
+    // Validate required parameters
+    if (!startTime || !endTime) {
+      return res.status(400).json({
+        success: false,
+        error: 'Start time and end time are required'
+      });
+    }
+    
+    // Check if the time is specified in Eastern Time
+    if (typeof summary === 'string') {
+      // First check for formats like "at 2PM", "at 2 PM", "at 2:30PM", "at 2:30 PM"
+      // This regex specifically looks for "at" followed by a time
+      let timeMatch = summary.match(/at\s+(\d+)(?::(\d+))?\s*([AP]M)/i);
+      
+      // If not found, check for direct time formats like "2PM", "2 PM", "2:30PM", "2:30 PM"
+      if (!timeMatch) {
+        // This will match the first occurrence of a time pattern
+        timeMatch = summary.match(/\b(\d+)(?::(\d+))?\s*([AP]M)\b/i);
+      }
+      
+      if (timeMatch) {
+        console.log('Detected time in summary:', timeMatch[0]);
+        const hour = parseInt(timeMatch[1]);
+        const minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+        const isPM = timeMatch[3].toUpperCase() === 'PM';
+        
+        // Convert to 24-hour format
+        let hour24 = hour;
+        if (isPM && hour < 12) hour24 += 12;
+        if (!isPM && hour === 12) hour24 = 0;
+        
+        // Extract the date from the original startTime
+        const originalDate = new Date(startTime);
+        const year = originalDate.getUTCFullYear();
+        const month = originalDate.getUTCMonth();
+        const day = originalDate.getUTCDate();
+        
+        // Create a new Date object in Eastern Time
+        // First create the date in local time
+        const etDate = new Date(year, month, day, hour24, minute, 0);
+        
+        // Then convert it to an ISO string with Eastern Time zone offset
+        // Use -04:00 for EDT (summer) or -05:00 for EST (winter)
+        // For simplicity, we'll use -04:00 since we're dealing with future dates in 2025
+        const etDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00-04:00`;
+        
+        // Calculate end time (always 30 minutes later)
+        const etEndDate = new Date(etDate);
+        etEndDate.setMinutes(etEndDate.getMinutes() + 30);
+        const etEndDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(etEndDate.getHours()).padStart(2, '0')}:${String(etEndDate.getMinutes()).padStart(2, '0')}:00-04:00`;
+        
+        // Update the start and end times
+        startTime = etDateString;
+        endTime = etEndDateString;
+        
+        console.log(`Adjusted time to match specified time: ${startTime} to ${endTime}`);
+      }
+    } else {
+      // If no time is specified in the summary, ensure we're using Eastern Time
+      // This handles the case where the time is passed directly in startTime/endTime
+      try {
+        // Parse the startTime
+        const startDate = new Date(startTime);
+        
+        // Create a formatter that will output the time in Eastern Time
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        // Format the date in Eastern Time
+        const etParts = formatter.formatToParts(startDate);
+        const etValues = {};
+        etParts.forEach(part => {
+          etValues[part.type] = part.value;
+        });
+        
+        // Extract the components
+        const etYear = parseInt(etValues.year);
+        const etMonth = parseInt(etValues.month) - 1; // Month is 0-based
+        const etDay = parseInt(etValues.day);
+        const etHour = parseInt(etValues.hour);
+        const etMinute = parseInt(etValues.minute);
+        
+        // Create a new Date object with these components
+        const etDate = new Date(etYear, etMonth, etDay, etHour, etMinute, 0);
+        
+        // Format as ISO string with Eastern Time offset
+        const etDateString = `${etYear}-${String(etMonth + 1).padStart(2, '0')}-${String(etDay).padStart(2, '0')}T${String(etHour).padStart(2, '0')}:${String(etMinute).padStart(2, '0')}:00-04:00`;
+        
+        // Calculate end time (30 minutes later)
+        const etEndDate = new Date(etDate);
+        etEndDate.setMinutes(etEndDate.getMinutes() + 30);
+        const etEndDateString = `${etYear}-${String(etMonth + 1).padStart(2, '0')}-${String(etDay).padStart(2, '0')}T${String(etEndDate.getHours()).padStart(2, '0')}:${String(etEndDate.getMinutes()).padStart(2, '0')}:00-04:00`;
+        
+        // Update the start and end times
+        startTime = etDateString;
+        endTime = etEndDateString;
+        
+        console.log(`Converted time to Eastern Time: ${startTime} to ${endTime}`);
+      } catch (error) {
+        console.error('Error converting time to Eastern Time:', error);
+        // Continue with the original times if there's an error
+      }
+    }
+    
+    // Ensure the meeting is exactly 30 minutes long
+    const startDate = new Date(startTime);
+    const endDate = new Date(startTime);
+    endDate.setMinutes(endDate.getMinutes() + 30);
+    endTime = endDate.toISOString();
+    
+    console.log(`Scheduling event from ${startTime} to ${endTime} using ${calendarProvider}`);
+    
+    // Ensure attendees is always an array
+    let parsedAttendees = [];
+    if (attendees) {
+      try {
+        // If attendees is a string (JSON), parse it
+        if (typeof attendees === 'string') {
+          parsedAttendees = JSON.parse(attendees);
+        } else if (Array.isArray(attendees)) {
+          parsedAttendees = attendees;
+        } else if (typeof attendees === 'object') {
+          // If it's a single object, wrap it in an array
+          parsedAttendees = [attendees];
+        }
+      } catch (error) {
+        console.error('Error parsing attendees:', error);
+        // Default to empty array if parsing fails
+        parsedAttendees = [];
+      }
+    }
+    
+    console.log('Parsed attendees:', parsedAttendees);
+    
+    // Create calendar event based on the provider
+    let event;
+    if (calendarProvider.toLowerCase() === 'microsoft') {
+      event = await createMicrosoftCalendarEvent({
+        startTime,
+        endTime,
+        summary: summary || 'Scheduled Meeting',
+        description: description || '',
+        attendees: parsedAttendees
+      });
+    } else {
+      // Default to Google Calendar
+      event = await createGoogleCalendarEvent({
+        startTime,
+        endTime,
+        summary: summary || 'Scheduled Meeting',
+        description: description || '',
+        attendees: parsedAttendees
+      });
+    }
+    
+    // Format times in Eastern Time for display
+    const formatTimeInET = (isoString) => {
+      const date = new Date(isoString);
+      
+      // Get hour and minute components
+      const etDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const hour = etDate.getHours() % 12 || 12; // Convert to 12-hour format
+      const minute = etDate.getMinutes();
+      const ampm = etDate.getHours() >= 12 ? 'PM' : 'AM';
+      
+      // Format time in a voice-friendly way
+      let formattedTime;
+      if (minute === 0) {
+        // For times on the hour, use "9AM" format (no space)
+        formattedTime = `${hour}${ampm}`;
+      } else if (minute === 30) {
+        // For half hours, use "9:30AM" format (no space)
+        formattedTime = `${hour}:30${ampm}`;
+      } else {
+        // For other times, use standard format with no space
+        formattedTime = `${hour}:${minute.toString().padStart(2, '0')}${ampm}`;
+      }
+      
+      // Format the date part separately
+      const dateOptions = {
+        timeZone: 'America/New_York',
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      };
+      
+      const datePart = date.toLocaleDateString('en-US', dateOptions);
+      
+      return `${datePart} at ${formattedTime}`;
+    };
+    
+    // Create a simplified response with only essential information
+    const simplifiedEvent = {
+      summary: event.summary,
+      formattedStart: formatTimeInET(event.start.dateTime),
+      formattedEnd: formatTimeInET(event.end.dateTime),
+      attendees: event.attendees.map(attendee => attendee.email).join(', '),
+      status: 'confirmed'
+    };
+    
+    // Log the full event for debugging
+    console.log('Full event details:', JSON.stringify(event, null, 2));
+    
+    // Clean up any Microsoft Teams details that could confuse the AI
+    if (event.description && event.description.includes('Microsoft Teams')) {
+      // Extract just the first part of the description before the Teams details
+      const cleanDescription = event.description.split('______')[0].trim();
+      // Update the simplified event with the clean description
+      simplifiedEvent.description = cleanDescription;
+    } else {
+      // For non-Teams events, just use the description as is
+      simplifiedEvent.description = event.description || '';
+    }
+    
+    // Create a clear confirmation message without any Teams meeting details
+    const confirmationMessage = `Meeting scheduled successfully for ${simplifiedEvent.formattedStart}. A calendar invitation has been sent to ${simplifiedEvent.attendees}.`;
+    
+    // Return only the simplified event to the client
+    res.json({
+      success: true,
+      message: confirmationMessage,
+      event: simplifiedEvent
+    });
+  } catch (error) {
+    console.error('Error scheduling calendar event:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Calendar context for Ultravox
+function getCalendarContext(startDate = new Date(), days = 7) {
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + days);
+  
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+    durationMinutes: 30
+  };
+}
+
 // Start server
 server.listen(PORT, async () => {
     // Log any missing configurations first (will be hidden by the clean output)
@@ -1811,5 +2647,243 @@ server.listen(PORT, async () => {
     if (configWarnings.length > 0) {
         console.log('\n--- Configuration Warnings ---');
         configWarnings.forEach(warning => console.warn(warning));
+    }
+});
+
+// Microsoft OAuth2 endpoints
+app.get('/auth/microsoft', (req, res) => {
+  const clientId = process.env.MS_CLIENT_ID;
+  const redirectUri = `${process.env.BASE_URL}/oauth2callback-microsoft`;
+  const scope = 'offline_access Calendars.ReadWrite';
+  
+  const authUrl = `https://login.microsoftonline.com/aipowergrid.io/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_mode=query`;
+  
+  res.redirect(authUrl);
+});
+
+app.get('/oauth2callback-microsoft', async (req, res) => {
+  const code = req.query.code;
+  
+  if (!code) {
+    return res.status(400).send('Authorization code not received');
+  }
+  
+  try {
+    const tokenResponse = await fetch('https://login.microsoftonline.com/aipowergrid.io/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: process.env.MS_CLIENT_ID,
+        client_secret: process.env.MS_CLIENT_SECRET,
+        code: code,
+        redirect_uri: `${process.env.BASE_URL}/oauth2callback-microsoft`,
+        grant_type: 'authorization_code',
+      }),
+    });
+    
+    const tokenData = await tokenResponse.json();
+    
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to get token: ${tokenData.error_description || tokenData.error}`);
+    }
+    
+    // Display the refresh token to the user
+    res.send(`
+      <h1>Microsoft Authentication Successful</h1>
+      <p>Add this refresh token to your .env file:</p>
+      <pre>MS_REFRESH_TOKEN=${tokenData.refresh_token}</pre>
+      <p>Access token expires in ${tokenData.expires_in} seconds.</p>
+    `);
+  } catch (error) {
+    console.error('Error during Microsoft OAuth callback:', error);
+    res.status(500).send(`Authentication error: ${error.message}`);
+  }
+});
+
+// Add multer storage configuration for avatar uploads
+const avatarStorage = multer.memoryStorage();
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
+
+// Process and resize avatar images to 100x100
+function processAvatar(buffer) {
+  return new Promise((resolve, reject) => {
+    try {
+      // Create a new canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = 100;
+      canvas.height = 100;
+      
+      // Load image from buffer
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvas.getContext('2d');
+        
+        // Draw image to canvas with proper resizing
+        ctx.drawImage(img, 0, 0, 100, 100);
+        
+        // Get base64 data URL
+        const base64 = canvas.toDataURL('image/jpeg', 0.9);
+        resolve(base64);
+      };
+      
+      img.onerror = (err) => {
+        reject(new Error('Failed to process image'));
+      };
+      
+      img.src = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// API endpoint for handling avatar uploads
+app.post('/upload-avatar', avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No avatar image provided' });
+    }
+    
+    // Process the image using Sharp
+    const sharp = await import('sharp');
+    const processedImageBuffer = await sharp.default(req.file.buffer)
+      .resize(100, 100, { fit: 'cover' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    
+    // Convert to base64
+    const base64Image = `data:image/jpeg;base64,${processedImageBuffer.toString('base64')}`;
+    
+    // Return the processed image as base64
+    res.json({
+      success: true,
+      avatarUrl: base64Image
+    });
+  } catch (error) {
+    console.error('Error processing avatar:', error);
+    res.status(500).json({ error: 'Failed to process avatar image', details: error.message });
+  }
+});
+
+// API endpoint for cropping avatars
+app.post('/crop-avatar', express.json({limit: '10mb'}), async (req, res) => {
+  try {
+    const { imageData, cropData } = req.body;
+    
+    if (!imageData || !cropData) {
+      return res.status(400).json({ error: 'Missing image data or crop coordinates' });
+    }
+    
+    // Check that we have all the required crop parameters
+    if (typeof cropData.x !== 'number' || typeof cropData.y !== 'number' || 
+        typeof cropData.width !== 'number' || typeof cropData.height !== 'number') {
+      return res.status(400).json({ error: 'Invalid crop coordinates' });
+    }
+    
+    // Extract base64 data
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    // Process the image using Sharp
+    const sharp = await import('sharp');
+    const processedImageBuffer = await sharp.default(imageBuffer)
+      .extract({ 
+        left: Math.round(cropData.x), 
+        top: Math.round(cropData.y), 
+        width: Math.round(cropData.width), 
+        height: Math.round(cropData.height) 
+      })
+      .resize(100, 100)
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    
+    // Convert to base64
+    const base64Image = `data:image/jpeg;base64,${processedImageBuffer.toString('base64')}`;
+    
+    // Return the processed image
+    res.json({
+      success: true,
+      avatarUrl: base64Image
+    });
+  } catch (error) {
+    console.error('Error cropping avatar:', error);
+    res.status(500).json({ error: 'Failed to crop avatar image', details: error.message });
+  }
+});
+
+app.post('/process-avatar', async (req, res) => {
+    try {
+        // Check if we have the file or a data URL in the request
+        let imageData = null;
+        
+        if (req.files && req.files.avatar) {
+            // Handle file upload
+            const avatarFile = req.files.avatar;
+            
+            // Read the file data
+            imageData = avatarFile.data;
+        } else if (req.body.avatarData) {
+            // Handle data URL
+            const dataUrl = req.body.avatarData;
+            const matches = dataUrl.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+            
+            if (!matches || matches.length !== 3) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid data URL format'
+                });
+            }
+            
+            // Extract base64 data
+            imageData = Buffer.from(matches[2], 'base64');
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'No avatar image provided'
+            });
+        }
+        
+        // Process the image with Sharp to ensure it's 100x100 pixels
+        const sharp = await import('sharp');
+        
+        const processedImage = await sharp.default(imageData)
+            .resize({
+                width: 100,
+                height: 100,
+                fit: 'cover',
+                position: 'center'
+            })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+        
+        // Convert to base64
+        const base64Image = `data:image/jpeg;base64,${processedImage.toString('base64')}`;
+        
+        // Return the base64 encoded image
+        res.json({
+            success: true,
+            avatarUrl: base64Image
+        });
+    } catch (error) {
+        console.error('Error processing avatar:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process avatar image'
+        });
     }
 });

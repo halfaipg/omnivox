@@ -370,6 +370,20 @@
             height: auto;
             border-radius: 6px;
             box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+        }
+
+        .logo-container a:hover .logo {
+            transform: scale(1.05);
+            box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+        }
+        
+        #appName {
+            transition: all 0.2s ease;
+        }
+        
+        a:hover #appName {
+            color: var(--accent-color);
         }
 
         .description {
@@ -496,7 +510,7 @@
         }
         
         #outboundForm button[type="submit"]:hover {
-            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+            transform: translateY(-2px);
         }
         
         /* Add a subtle divider between form fields */
@@ -1493,6 +1507,19 @@
                 --call-button-pulse: rgba(32, 84, 154, 0.5);
             }
         }
+
+        .logo-container a:hover .logo {
+            transform: scale(1.05);
+            box-shadow: 0 5px 12px rgba(0,0,0,0.3);
+        }
+        
+        #appName {
+            transition: all 0.2s ease;
+        }
+        
+        a:hover #appName {
+            color: var(--accent-color);
+        }
     </style>
     <script type="importmap" id="livelibsimportmap">
         {
@@ -1505,9 +1532,13 @@
 <body>
     <div class="header">
         <div class="logo-container">
-            <img id="appLogo" src="https://brand.aipowergrid.io/_data/i/upload/2024/03/14/20240314185634-06dfd4e5-2s.png" alt="App Logo" class="logo">
+            <a href="/" title="Return to home page">
+                <img id="appLogo" src="https://brand.aipowergrid.io/_data/i/upload/2024/03/14/20240314185634-06dfd4e5-2s.png" alt="App Logo" class="logo">
+            </a>
         </div>
-        <h1 id="appName">OmniVox</h1>
+        <a href="/" style="text-decoration: none; color: inherit;" title="Return to home page">
+            <h1 id="appName">OmniVox</h1>
+        </a>
         
         <!-- Theme toggle switch -->
         <div class="theme-switch-wrapper">
@@ -1571,8 +1602,13 @@
                 <small class="help-text">The name agent will introduce itself as</small>
             </div>
             <div>
+                <label for="webrtc-userEmail">Your Email (optional)</label>
+                <input type="email" id="webrtc-userEmail" name="webrtc-userEmail" placeholder="For calendar scheduling">
+                <small class="help-text">Used for calendar scheduling if you want to receive invites</small>
+            </div>
+            <div>
                 <label for="webrtc-systemPrompt">System Prompt</label>
-                <textarea id="webrtc-systemPrompt" name="webrtc-systemPrompt" rows="6" placeholder="Leave empty to use default system prompt"></textarea>
+                <textarea id="webrtc-systemPrompt" name="webrtc-systemPrompt" rows="6" placeholder="Loading default system prompt..."></textarea>
                 <small class="help-text">Optional: Customize the AI's behavior with a specific prompt</small>
             </div>
 
@@ -1660,7 +1696,7 @@
             <div>
                 <label for="tools">Tools (optional)</label>
                 <input type="text" id="tools" name="tools" placeholder="Leave empty to disable tools">
-                <small class="help-text">Empty = tools disabled, comma-separated list = specific tools enabled i.e 'hangup,time'</small>
+                <small class="help-text">Empty = tools disabled, comma-separated list = specific tools enabled i.e 'hangup,weather'</small>
             </div>
             <div>
                 <label for="agentName">Agent Name</label>
@@ -1669,9 +1705,8 @@
             </div>
             <div>
                 <label for="systemPrompt">System Prompt</label>
-                <textarea id="systemPrompt" name="systemPrompt" rows="13" placeholder="Default: You are playing the role of a naive and gullible person who is easily scammed. Your goal is to waste scammers' time by acting interested but confused. Speak slowly, ask repetitive questions, and pretend to have technical difficulties. Make them explain things multiple times. Act like you're eager to send money but keep finding excuses to delay. Use phrases like 'Oh gosh, I'm not very good with computers' and 'Can you explain that again? I want to make sure I do it right.' Keep them on the line as long as possible. Only use the hangUp tool if you've engaged with them for at least 5 minutes and there's a natural conclusion to the call.'
-
-Leave empty to use the above prompt."></textarea>
+                <textarea id="systemPrompt" name="systemPrompt" rows="13" placeholder="Loading default system prompt..."></textarea>
+                <small class="help-text">Optional: Customize the AI's behavior with a specific prompt</small>
             </div>
             <div class="form-group">
                 <button type="submit" id="submitBtn">Initiate Call<span id="loadingSpinner" class="spinner hidden"></span></button>
@@ -1849,11 +1884,13 @@ Leave empty to use the above prompt."></textarea>
         ringtone.preload = 'auto';
         ringtone.load();
         ringtone.loop = true;
+        ringtone.volume = 0.4;
         
         const hangupSound = new Audio('cell-hangup.mp3');
         hangupSound.preload = 'auto';
         hangupSound.load();
         hangupSound.loop = false;
+        hangupSound.volume = 0.3;
         
         const connectSound = new Audio('phone-pick-up-1.mp3');
         connectSound.preload = 'auto';
@@ -3029,10 +3066,61 @@ Leave empty to use the above prompt."></textarea>
             }
         }
 
+        // Function to determine time of day based on hour
+        function getTimeOfDay(hour) {
+            console.log(`Current hour: ${hour}, determining time of day...`);
+            if (hour >= 5 && hour < 12) {
+                console.log(`Time of day: morning (${hour})`);
+                return "morning";
+            }
+            if (hour >= 12 && hour < 17) {
+                console.log(`Time of day: afternoon (${hour})`);
+                return "afternoon";
+            }
+            if (hour >= 17 && hour < 22) {
+                console.log(`Time of day: evening (${hour})`);
+                return "evening";
+            }
+            console.log(`Time of day: night (${hour})`);
+            return "night";
+        }
+
+        // Function to format time in 12-hour format with AM/PM
+        function formatTime(date) {
+            let hours = date.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes} ${ampm}`;
+        }
+
+        // Load system prompt from server
+        async function loadSystemPrompt(promptType = 'inbound', elementId = 'webrtc-systemPrompt') {
+            try {
+                const response = await fetch(`/system-prompt?type=${promptType}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const promptElement = document.getElementById(elementId);
+                    if (promptElement) {
+                        promptElement.placeholder = data.prompt || "Default system prompt not available";
+                    }
+                } else {
+                    console.error(`Failed to load ${promptType} system prompt`);
+                }
+            } catch (error) {
+                console.error(`Error loading ${promptType} system prompt:`, error);
+            }
+        }
+
         // Tab switching functionality
         document.addEventListener('DOMContentLoaded', function() {
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
+            
+            // Load system prompts for both tabs
+            loadSystemPrompt('inbound', 'webrtc-systemPrompt');
+            loadSystemPrompt('outbound', 'systemPrompt');
             
             tabButtons.forEach(button => {
                 button.addEventListener('click', () => {
@@ -3136,6 +3224,22 @@ Leave empty to use the above prompt."></textarea>
                     // Wait 2-5 seconds before starting the connection
                     await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 3000) + 2000));
                     
+                    // Debug time information
+                    const now = new Date();
+                    const localTimeString = now.toLocaleString();
+                    const hour = now.getHours();
+                    const minute = now.getMinutes();
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    const hour12 = hour % 12 || 12;
+                    const exactTimeString = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                    
+                    console.log('Time debug info:', {
+                        localTime: localTimeString,
+                        exactTime: exactTimeString,
+                        hour24: hour,
+                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    });
+                    
                     // Get join URL from server
                     const response = await fetch('/webrtc-join-url', {
                         method: 'POST',
@@ -3146,7 +3250,12 @@ Leave empty to use the above prompt."></textarea>
                             agentName: agentName || 'Loddie',
                             voiceId: document.getElementById('webrtc-voiceId').value || undefined,
                             corpusId: document.getElementById('webrtc-corpusId').value || undefined,
-                            systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined
+                            // Send system prompt as entered by the user without modifications
+                            systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined,
+                            userEmail: document.getElementById('webrtc-userEmail').value || undefined,
+                            // Simplified time information
+                            userLocalTimeString: localTimeString,
+                            userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                         })
                     });
                     
@@ -3311,7 +3420,27 @@ Leave empty to use the above prompt."></textarea>
                 endCallButton.classList.add('hidden-control');
                 endCallButton.classList.remove('show-control');
                 
+                // Set initial "Call ended" message
                 callStatus.textContent = 'Call ended';
+                
+                // Change to "Call again" after 3 seconds
+                setTimeout(() => {
+                    if (!callActive) { // Only change if still not in a call
+                        callStatus.textContent = 'Call again';
+                        
+                        // Make the message grey like other status messages
+                        callStatus.style.color = 'var(--text-secondary)';
+                        callStatus.style.fontWeight = '500';
+                        
+                        // Reset the style when the user starts a new call
+                        startCallButton.addEventListener('click', function resetCallStatusStyle() {
+                            callStatus.style.color = '';
+                            callStatus.style.fontWeight = '';
+                            startCallButton.removeEventListener('click', resetCallStatusStyle);
+                        }, { once: true });
+                    }
+                }, 3000);
+                
                 callSession = null;
                 
                 // Generate and show shareable link
@@ -3342,9 +3471,6 @@ Leave empty to use the above prompt."></textarea>
                 if (corpusId) shareableLink += 'corpus=' + encodeURIComponent(corpusId) + '&';
                 if (systemPrompt) shareableLink += 'prompt=' + encodeURIComponent(systemPrompt);
                 
-                // Add tab parameter to open the WebRTC tab
-                shareableLink += (shareableLink.endsWith('&') ? '' : '&') + 'tab=webrtc';
-                
                 // Remove trailing '&' if needed
                 if (shareableLink.endsWith('&')) {
                     shareableLink = shareableLink.slice(0, -1);
@@ -3355,6 +3481,42 @@ Leave empty to use the above prompt."></textarea>
                 
                 // Show the container
                 shareableLinkContainer.classList.remove('hidden');
+                
+                // Log the generated link for debugging
+                console.log('Generated WebRTC shareable link:', shareableLink);
+                console.log('Voice ID:', voiceId);
+                console.log('Corpus ID:', corpusId);
+                
+                // Create or update the widget integration link
+                let widgetLinkContainer = document.getElementById('webrtc-widgetLinkContainer');
+                if (!widgetLinkContainer) {
+                    widgetLinkContainer = document.createElement('div');
+                    widgetLinkContainer.id = 'webrtc-widgetLinkContainer';
+                    widgetLinkContainer.className = 'widget-link-container';
+                    widgetLinkContainer.style.marginTop = '10px';
+                    widgetLinkContainer.style.padding = '10px';
+                    widgetLinkContainer.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
+                    widgetLinkContainer.style.borderRadius = '4px';
+                    widgetLinkContainer.style.display = 'flex';
+                    widgetLinkContainer.style.alignItems = 'center';
+                    widgetLinkContainer.style.justifyContent = 'space-between';
+                    
+                    const widgetLinkText = document.createElement('span');
+                    widgetLinkText.innerHTML = '<strong>Add this voice agent to your website!</strong> Create an embeddable widget with your settings.';
+                    
+                    const widgetLinkButton = document.createElement('a');
+                    widgetLinkButton.href = '/widget/';
+                    widgetLinkButton.className = 'button';
+                    widgetLinkButton.textContent = 'Create Widget';
+                    widgetLinkButton.style.marginLeft = '10px';
+                    widgetLinkButton.style.whiteSpace = 'nowrap';
+                    
+                    widgetLinkContainer.appendChild(widgetLinkText);
+                    widgetLinkContainer.appendChild(widgetLinkButton);
+                    
+                    // Insert it after the shareable link container
+                    shareableLinkContainer.parentNode.insertBefore(widgetLinkContainer, shareableLinkContainer.nextSibling);
+                }
             }
 
             // End call button click handler
@@ -3418,10 +3580,11 @@ Leave empty to use the above prompt."></textarea>
         // Function to update WebRTC voice dropdown when voices are loaded
         function updateWebRTCVoiceDropdown(voices) {
             const webrtcVoiceIdSelect = document.getElementById('webrtc-voiceId');
-            if (!webrtcVoiceIdSelect) return;
+            const voiceIdSelect = document.getElementById('voiceId');
+            
+            if (!webrtcVoiceIdSelect || !voiceIdSelect) return;
             
             // Copy options from main voice dropdown
-            const voiceIdSelect = document.getElementById('voiceId');
             if (voiceIdSelect && voiceIdSelect.options.length > 0) {
                 webrtcVoiceIdSelect.innerHTML = voiceIdSelect.innerHTML;
             } else if (voices && voices.length > 0) {
@@ -3443,22 +3606,36 @@ Leave empty to use the above prompt."></textarea>
                 });
             }
             
-            // Check if there's a pending voice selection from URL parameters
-            const pendingVoiceId = webrtcVoiceIdSelect.getAttribute('data-pending-value');
-            if (pendingVoiceId) {
-                console.log('Setting pending voice ID:', pendingVoiceId);
+            // Check for pending voice selections from URL parameters
+            const selects = [voiceIdSelect, webrtcVoiceIdSelect];
+            
+            selects.forEach(select => {
+                if (!select) return;
                 
-                // Try to find the option with this value
-                const option = Array.from(webrtcVoiceIdSelect.options).find(opt => opt.value === pendingVoiceId);
-                if (option) {
-                    option.selected = true;
-                    console.log('Successfully set voice ID from URL parameter');
-                } else {
-                    console.warn('Could not find voice option with ID:', pendingVoiceId);
+                const pendingVoiceId = select.getAttribute('data-pending-value');
+                if (pendingVoiceId) {
+                    console.log(`Setting pending voice ID for ${select.id}:`, pendingVoiceId);
+                    
+                    // Try to find the option with this value
+                    const option = Array.from(select.options).find(opt => opt.value === pendingVoiceId);
+                    if (option) {
+                        option.selected = true;
+                        console.log(`Successfully set voice ID from URL parameter for ${select.id}`);
+                    } else {
+                        console.warn(`Could not find voice option with ID for ${select.id}:`, pendingVoiceId);
+                    }
+                    
+                    // Clear the pending value
+                    select.removeAttribute('data-pending-value');
                 }
-                
-                // Clear the pending value
-                webrtcVoiceIdSelect.removeAttribute('data-pending-value');
+            });
+            
+            // Make sure both selects have the same value
+            // If one has a value from URL and the other doesn't, sync them
+            if (voiceIdSelect.value && !webrtcVoiceIdSelect.value) {
+                webrtcVoiceIdSelect.value = voiceIdSelect.value;
+            } else if (!voiceIdSelect.value && webrtcVoiceIdSelect.value) {
+                voiceIdSelect.value = webrtcVoiceIdSelect.value;
             }
         }
 
@@ -3488,25 +3665,37 @@ Leave empty to use the above prompt."></textarea>
                 const webrtcCorpusIdSelect = document.getElementById('webrtc-corpusId');
                 
                 if (corpusIdSelect && webrtcCorpusIdSelect) {
+                    // Sync the dropdowns
                     webrtcCorpusIdSelect.innerHTML = corpusIdSelect.innerHTML;
-                    webrtcCorpusIdSelect.value = corpusIdSelect.value;
                     
-                    // Check if there's a pending corpus selection from URL parameters
-                    const pendingCorpusId = webrtcCorpusIdSelect.getAttribute('data-pending-value');
-                    if (pendingCorpusId) {
-                        console.log('Setting pending corpus ID:', pendingCorpusId);
-                        
-                        // Try to find the option with this value
-                        const option = Array.from(webrtcCorpusIdSelect.options).find(opt => opt.value === pendingCorpusId);
-                        if (option) {
-                            option.selected = true;
-                            console.log('Successfully set corpus ID from URL parameter');
-                        } else {
-                            console.warn('Could not find corpus option with ID:', pendingCorpusId);
+                    // Check for pending corpus selections from URL parameters
+                    const selects = [corpusIdSelect, webrtcCorpusIdSelect];
+                    
+                    selects.forEach(select => {
+                        const pendingCorpusId = select.getAttribute('data-pending-value');
+                        if (pendingCorpusId) {
+                            console.log(`Setting pending corpus ID for ${select.id}:`, pendingCorpusId);
+                            
+                            // Try to find the option with this value
+                            const option = Array.from(select.options).find(opt => opt.value === pendingCorpusId);
+                            if (option) {
+                                option.selected = true;
+                                console.log(`Successfully set corpus ID from URL parameter for ${select.id}`);
+                            } else {
+                                console.warn(`Could not find corpus option with ID for ${select.id}:`, pendingCorpusId);
+                            }
+                            
+                            // Clear the pending value
+                            select.removeAttribute('data-pending-value');
                         }
-                        
-                        // Clear the pending value
-                        webrtcCorpusIdSelect.removeAttribute('data-pending-value');
+                    });
+                    
+                    // Make sure both selects have the same value
+                    // If one has a value from URL and the other doesn't, sync them
+                    if (corpusIdSelect.value && !webrtcCorpusIdSelect.value) {
+                        webrtcCorpusIdSelect.value = corpusIdSelect.value;
+                    } else if (!corpusIdSelect.value && webrtcCorpusIdSelect.value) {
+                        corpusIdSelect.value = webrtcCorpusIdSelect.value;
                     }
                 }
                 
@@ -3537,50 +3726,52 @@ Leave empty to use the above prompt."></textarea>
         // Extend parseURLParams to handle WebRTC form fields
         const originalParseURLParams = window.parseURLParams;
         window.parseURLParams = function() {
-            // Call the original function first
-            if (originalParseURLParams) {
-                originalParseURLParams();
-            }
-            
             const urlParams = new URLSearchParams(window.location.search);
             
-            // Map URL parameters to WebRTC form field IDs
-            const webrtcParamMap = {
-                'voice': 'webrtc-voiceId',
-                'corpus': 'webrtc-corpusId',
-                'agent': 'webrtc-agentName',
-                'prompt': 'webrtc-systemPrompt'
+            // Map URL parameters to form field IDs for both tabs
+            const paramMap = {
+                'phone': 'phoneNumber',
+                'voice': ['voiceId', 'webrtc-voiceId'],
+                'corpus': ['corpusId', 'webrtc-corpusId'],
+                'tools': 'tools',
+                'agent': ['agentName', 'webrtc-agentName'],
+                'prompt': ['systemPrompt', 'webrtc-systemPrompt']
             };
             
-            // Fill WebRTC form fields based on URL parameters
-            for (const [param, fieldId] of Object.entries(webrtcParamMap)) {
+            // Fill form fields based on URL parameters
+            for (const [param, fieldIds] of Object.entries(paramMap)) {
                 if (urlParams.has(param)) {
-                    const field = document.getElementById(fieldId);
-                    if (field) {
-                        if (field.tagName === 'TEXTAREA') {
-                            field.value = decodeURIComponent(urlParams.get(param));
-                        } else if (field.tagName === 'SELECT') {
-                            // For select elements, we need to wait until options are loaded
-                            const paramValue = urlParams.get(param);
-                            
-                            // Try to set the value immediately if options are already loaded
-                            if (field.options.length > 1) {
-                                field.value = paramValue;
+                    // Handle both single field IDs and arrays of field IDs
+                    const fieldIdArray = Array.isArray(fieldIds) ? fieldIds : [fieldIds];
+                    
+                    fieldIdArray.forEach(fieldId => {
+                        const field = document.getElementById(fieldId);
+                        if (field) {
+                            if (field.tagName === 'TEXTAREA') {
+                                field.value = decodeURIComponent(urlParams.get(param));
+                            } else if (field.tagName === 'SELECT') {
+                                // For select elements, we need to wait until options are loaded
+                                const paramValue = urlParams.get(param);
                                 
-                                // If the value wasn't set (option doesn't exist yet), save it for later
-                                if (field.value !== paramValue) {
+                                // Try to set the value immediately if options are already loaded
+                                if (field.options.length > 1) {
+                                    field.value = paramValue;
+                                    
+                                    // If the value wasn't set (option doesn't exist yet), save it for later
+                                    if (field.value !== paramValue) {
+                                        field.setAttribute('data-pending-value', paramValue);
+                                        console.log(`Saved pending value for ${fieldId}: ${paramValue}`);
+                                    }
+                                } else {
+                                    // Save the value to set once options are loaded
                                     field.setAttribute('data-pending-value', paramValue);
                                     console.log(`Saved pending value for ${fieldId}: ${paramValue}`);
                                 }
                             } else {
-                                // Save the value to set once options are loaded
-                                field.setAttribute('data-pending-value', paramValue);
-                                console.log(`Saved pending value for ${fieldId}: ${paramValue}`);
+                                field.value = decodeURIComponent(urlParams.get(param));
                             }
-                        } else {
-                            field.value = decodeURIComponent(urlParams.get(param));
                         }
-                    }
+                    });
                 }
             }
             

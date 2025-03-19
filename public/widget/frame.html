@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Agent Widget</title>
+  <style>
+    /* Clean reset */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: transparent !important;
+      overflow: hidden;
+    }
+    
+    /* Direct body styling */
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: transparent !important;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+    
+    /* Widget styling - no extra containers */
+    .voice-agent-widget {
+      width: 100%;
+      max-width: 240px;
+      background-color: #ffffff;
+      border-radius: 18px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px;
+      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+      transform-origin: bottom left;
+      animation: widget-appear 0.4s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+      position: relative;
+    }
+    
+    /* Minimized state - ensure cursor pointer and content is centered */
+    .voice-agent-widget.minimized {
+      width: 72px;
+      height: 72px;
+      max-width: 72px;
+      padding: 0;
+      border-radius: 50%;
+      cursor: pointer;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    
+    /* Add tooltip for minimized state showing agent name */
+    .voice-agent-widget.minimized::after {
+      content: attr(data-agent-name);
+      position: absolute;
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    
+    .voice-agent-widget.minimized:hover::after {
+      opacity: 1;
+    }
+    
+    .voice-agent-widget.minimized .voice-agent-name,
+    .voice-agent-widget.minimized .voice-agent-status,
+    .voice-agent-widget.minimized .voice-agent-button {
+      display: none;
+    }
+    
+    .voice-agent-widget.minimized .voice-agent-avatar-container {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    
+    /* Modern animations */
+    @keyframes widget-appear {
+      0% { 
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+      100% { 
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    @keyframes pulse-subtle {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes speak-animation {
+      0% { 
+        transform: scale(1); 
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.1), 0 0 0 0 rgba(66, 133, 244, 0.05);
+      }
+      40% { 
+        transform: scale(1.02);
+        box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.07), 0 0 0 6px rgba(66, 133, 244, 0.03);
+      }
+      100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.1), 0 0 0 0 rgba(66, 133, 244, 0.05);
+      }
+    }
+    
+    @keyframes pickup-animation {
+      0% { transform: scale(1); opacity: 0.9; }
+      40% { transform: scale(1.3); opacity: 1; }
+      70% { transform: scale(1.25); opacity: 1; }
+      100% { transform: scale(1.05); opacity: 1; }
+    }
+    
+    @keyframes active-call-pulse {
+      0% { 
+        transform: scale(1); 
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.4);
+      }
+      50% { 
+        transform: scale(1.08); 
+        box-shadow: 0 0 0 10px rgba(66, 133, 244, 0.2), 0 0 0 20px rgba(66, 133, 244, 0.1);
+      }
+      100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.4);
+      }
+    }
+    
+    /* Dark theme */
+    .voice-agent-widget.dark {
+      background-color: #1e1e1e;
+      color: #ffffff;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    }
+    
+    /* Header */
+    .voice-agent-name {
+      font-weight: 600;
+      font-size: 18px;
+      margin-bottom: 16px;
+      text-align: center;
+      letter-spacing: -0.2px;
+    }
+    
+    /* Avatar with animations */
+    .voice-agent-avatar-container {
+      width: 72px;
+      height: 72px;
+      margin-bottom: 16px;
+      border-radius: 50%;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+    }
+    
+    .voice-agent-avatar {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+    
+    .voice-agent-avatar:hover {
+      transform: scale(1.05);
+    }
+    
+    .voice-agent-avatar-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #4285f4, #34a853);
+      color: white;
+      font-weight: 600;
+      font-size: 24px;
+    }
+    
+    .voice-agent-avatar.connecting {
+      animation: pulse-subtle 1.5s infinite;
+    }
+    
+    .voice-agent-avatar.active {
+      animation: active-call-pulse 3s ease-in-out infinite;
+    }
+    
+    .voice-agent-avatar.active.speaking {
+      animation: speak-animation 1.5s infinite;
+    }
+    
+    /* Status text */
+    .voice-agent-status {
+      font-size: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+      transition: all 0.2s ease;
+      color: #555;
+    }
+    
+    .dark .voice-agent-status {
+      color: #aaa;
+    }
+    
+    .voice-agent-status.active {
+      color: #34a853;
+    }
+    
+    .voice-agent-status.connecting {
+      color: #fbbc05;
+    }
+    
+    .voice-agent-status.thinking {
+      color: #4285f4;
+    }
+    
+    .voice-agent-status.speaking {
+      color: #34a853;
+      font-weight: 500;
+    }
+    
+    .voice-agent-status.listening {
+      color: #4285f4;
+      font-weight: 500;
+    }
+    
+    .voice-agent-status.disconnecting {
+      color: #ea4335;
+    }
+    
+    .voice-agent-status.error {
+      color: #ea4335;
+    }
+    
+    /* Modern button styling */
+    .voice-agent-button {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #4285f4, #176ef2);
+      color: white;
+      border: none;
+      border-radius: 100px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(66, 133, 244, 0.3);
+      outline: none;
+      min-width: 140px;
+      text-align: center;
+    }
+    
+    .voice-agent-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4);
+    }
+    
+    .voice-agent-button:active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 4px rgba(66, 133, 244, 0.4);
+    }
+    
+    .voice-agent-button.end {
+      background: linear-gradient(135deg, #ea4335, #d93025);
+      box-shadow: 0 2px 8px rgba(234, 67, 53, 0.3);
+    }
+    
+    .voice-agent-button.end:hover {
+      box-shadow: 0 4px 12px rgba(234, 67, 53, 0.4);
+    }
+    
+    /* Transcript styling */
+    .voice-agent-transcript {
+      display: none;
+    }
+    
+    /* Responsive styling */
+    @media (max-width: 480px) {
+      .voice-agent-widget {
+        width: 220px;
+        padding: 16px 14px;
+      }
+    }
+    
+    /* Pulse animation for minimized bubble with stronger effect */
+    @keyframes pulse-bubble {
+      0% { 
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      50% { 
+        transform: scale(1.05);
+        box-shadow: 0 8px 24px rgba(66, 133, 244, 0.25);
+      }
+      100% { 
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+    }
+    
+    .voice-agent-widget.minimized:hover {
+      animation: pulse-bubble 2s infinite ease-in-out;
+    }
+    
+    .voice-agent-widget.minimized:active {
+      transform: scale(0.95);
+    }
+    
+    .voice-agent-avatar.pickup {
+      animation: pickup-animation 0.8s forwards;
+    }
+    
+    /* Apply animations to the avatar container instead of just the image */
+    .voice-agent-avatar-container.connecting {
+      animation: pulse-subtle 1.5s infinite;
+    }
+    
+    .voice-agent-avatar-container.active {
+      /* Remove the continuous pulse for active state */
+      transform: scale(1.05);
+      transition: transform 0.3s ease;
+    }
+    
+    .voice-agent-avatar-container.speaking {
+      animation: speak-animation 1.5s infinite;
+    }
+    
+    .voice-agent-avatar-container.pickup {
+      animation: pickup-animation 0.8s forwards;
+    }
+  </style>
+  
+  <!-- Define base domain globally -->
+  <script>
+    // Base domain for all API calls and resources
+    const BASE_DOMAIN = "https://omnivox.io";
+    
+    // SDK Proxy endpoints for better CORS support
+    const SDK_ENDPOINTS = {
+      esm: `${BASE_DOMAIN}/sdk-proxy/esm/index.js`,
+      umd: `${BASE_DOMAIN}/sdk-proxy/umd/ultravox-session.js`
+    };
+    
+    // Audio resources
+    const AUDIO = {
+      ringtone: `${BASE_DOMAIN}/mixkit-marimba-waiting-ringtone-1360.wav`,
+      connectSound: `${BASE_DOMAIN}/phone-pick-up-1.mp3`,
+      hangupSound: `${BASE_DOMAIN}/cell-hangup.mp3`
+    };
+  </script>
+  
+  <!-- First load the import map to resolve module dependencies -->
+  <script type="importmap">
+  {
+    "imports": {
+      "livekit-client": "https://cdn.jsdelivr.net/npm/livekit-client@1.11.2/dist/livekit-client.esm.mjs"
+    }
+  }
+  </script>
+  
+  <!-- Then try to load the Ultravox SDK -->
+  <script type="module">
+    // Preload the Ultravox SDK with better error handling
+    async function preloadUltravoxSDK() {
+      try {
+        // First ensure LiveKit is loaded
+        const LivekitClient = await import('livekit-client');
+        window.LivekitClient = LivekitClient;
+        
+        console.log('LiveKit loaded successfully');
+        
+        // Then try to load the SDK
+        console.log('Attempting to load SDK from:', SDK_ENDPOINTS.esm);
+        const { UltravoxSession } = await import(SDK_ENDPOINTS.esm);
+        window.UltravoxSession = UltravoxSession;
+        console.log('Ultravox SDK preloaded successfully');
+        
+        // PATCH: Override the problematic method in the prototype
+        patchUltravoxSDK();
+      } catch(error) {
+        console.error('Failed to preload Ultravox SDK:', error);
+        
+        // Try UMD fallback with LiveKit global
+        try {
+          await new Promise((resolve, reject) => {
+            // First load LiveKit UMD
+            const livekitScript = document.createElement('script');
+            livekitScript.src = 'https://cdn.jsdelivr.net/npm/livekit-client@1.11.2/dist/livekit-client.umd.js';
+            livekitScript.onload = async () => {
+              // Then load Ultravox SDK
+              const script = document.createElement('script');
+              script.src = SDK_ENDPOINTS.umd;
+              script.async = true;
+              script.onload = () => {
+                if (window.UltravoxSession) {
+                  console.log('UltravoxSession loaded via fallback script');
+                  // PATCH: Override the problematic method in the prototype
+                  patchUltravoxSDK();
+                  resolve();
+                } else {
+                  reject(new Error('UltravoxSession not found in window after script load'));
+                }
+              };
+              script.onerror = () => reject(new Error('Failed to load UltravoxSession script'));
+              document.head.appendChild(script);
+            };
+            livekitScript.onerror = () => reject(new Error('Failed to load LiveKit UMD'));
+            document.head.appendChild(livekitScript);
+          });
+        } catch (fallbackError) {
+          console.error('Fallback SDK loading failed:', fallbackError);
+          // Show error in widget
+          const statusElement = document.querySelector('.voice-agent-status');
+          if (statusElement) {
+            statusElement.textContent = 'Failed to load voice assistant. Please try again later.';
+            statusElement.className = 'voice-agent-status error';
+          }
+        }
+      }
+    }
+    
+    // Patch the UltravoxSession prototype to handle the missing setAudioContext method
+    function patchUltravoxSDK() {
+      if (!window.UltravoxSession) {
+        console.error('Cannot patch UltravoxSession: not loaded');
+        return;
+      }
+      
+      console.log('Applying UltravoxSession patches...');
+      
+      // Patch 1: Handle the setAudioContext method by adding it to LocalAudioTrack
+      if (window.LivekitClient && window.LivekitClient.LocalAudioTrack) {
+        const originalCreateLocalAudioTrack = window.LivekitClient.LocalTrack.createLocalAudioTrack;
+        window.LivekitClient.LocalTrack.createLocalAudioTrack = async function(options) {
+          console.log('PATCH: Intercepted createLocalAudioTrack');
+          const track = await originalCreateLocalAudioTrack.call(this, options);
+          
+          // Add the missing method to the track
+          if (!track.setAudioContext) {
+            console.log('PATCH: Adding setAudioContext to newly created LocalAudioTrack');
+            track.setAudioContext = function(audioContext) {
+              console.log('PATCH: setAudioContext called on LocalAudioTrack with', audioContext);
+              // No-op implementation
+              return this;
+            };
+          }
+          
+          return track;
+        };
+        
+        // Also patch the prototype for all future instances
+        if (!window.LivekitClient.LocalAudioTrack.prototype.setAudioContext) {
+          window.LivekitClient.LocalAudioTrack.prototype.setAudioContext = function(audioContext) {
+            console.log('PATCH: setAudioContext called via prototype with', audioContext);
+            // No-op implementation
+            return this;
+          };
+        }
+      }
+      
+      // Patch 2: Store the original handleSocketMessage method
+      const originalHandleSocketMessage = window.UltravoxSession.prototype.handleSocketMessage;
+      
+      // Override the handleSocketMessage method to handle setAudioContext
+      window.UltravoxSession.prototype.handleSocketMessage = function(event) {
+        try {
+          // Add the missing method if it doesn't exist
+          if (this.localAudioTrack && !this.localAudioTrack.setAudioContext) {
+            console.log('PATCH: Adding setAudioContext method to localAudioTrack in handleSocketMessage');
+            this.localAudioTrack.setAudioContext = function(audioContext) {
+              console.log('PATCH: setAudioContext called with', audioContext);
+              // Do nothing, this is just a stub to prevent errors
+              return this;
+            };
+          }
+          
+          // Call the original method with try/catch to prevent uncaught errors
+          return originalHandleSocketMessage.call(this, event);
+        } catch (error) {
+          console.error('PATCH: Caught error in handleSocketMessage:', error);
+          // Try to recover
+          if (error.message && error.message.includes('setAudioContext is not a function')) {
+            console.log('PATCH: Recovering from setAudioContext error');
+            
+            // Force the audio context to be set on the track
+            if (this.localAudioTrack) {
+              this.localAudioTrack.setAudioContext = function() { return this; };
+            }
+          }
+        }
+      };
+      
+      // Patch 3: Also patch the joinCall method to ensure localAudioTrack has the method
+      const originalJoinCall = window.UltravoxSession.prototype.joinCall;
+      window.UltravoxSession.prototype.joinCall = async function(joinUrl) {
+        console.log('PATCH: Patched joinCall called');
+        
+        // Ensure audio context is created before joining
+        if (!this.audioContext && typeof AudioContext !== 'undefined') {
+          this.audioContext = window.globalAudioContext || new AudioContext();
+          console.log('PATCH: Using audio context in joinCall:', this.audioContext);
+        }
+        
+        try {
+          // Call the original method
+          const result = await originalJoinCall.call(this, joinUrl);
+          
+          // Ensure localAudioTrack has setAudioContext method after joining
+          if (this.localAudioTrack && !this.localAudioTrack.setAudioContext) {
+            console.log('PATCH: Adding setAudioContext method to localAudioTrack after join');
+            this.localAudioTrack.setAudioContext = function(audioContext) {
+              console.log('PATCH: setAudioContext called with', audioContext);
+              // Do nothing, this is just a stub to prevent errors
+              return this;
+            };
+          }
+          
+          return result;
+        } catch (error) {
+          console.error('PATCH: Error in joinCall:', error);
+          
+          // Try to recover if it's the setAudioContext error
+          if (error.message && error.message.includes('setAudioContext is not a function')) {
+            console.log('PATCH: Recovering from setAudioContext error in joinCall');
+            
+            // Add the method and retry
+            if (this.localAudioTrack) {
+              this.localAudioTrack.setAudioContext = function() { return this; };
+              // Retry the operation that failed
+              return await originalJoinCall.call(this, joinUrl);
+            }
+          }
+          
+          throw error; // Re-throw if we couldn't recover
+        }
+      };
+      
+      // Patch 4: Add global error handler to catch any missed setAudioContext errors
+      window.addEventListener('error', function(event) {
+        if (event.error && event.error.message && event.error.message.includes('setAudioContext is not a function')) {
+          console.log('PATCH: Global error handler caught setAudioContext error');
+          event.preventDefault(); // Prevent the error from propagating
+          return false;
+        }
+      }, true);
+      
+      console.log('PATCH: Successfully patched UltravoxSession prototype and LiveKit components');
+    }
+    
+    // Call the preload function and wait for it to complete
+    await preloadUltravoxSDK();
+  </script>
+</head>
+<body>
+  <!-- Place widget directly in body - no container div -->
+  <div class="voice-agent-widget">
+    <h3 class="voice-agent-name">AI Assistant</h3>
+    <div class="voice-agent-avatar-container" onclick="toggleWidget()">
+      <img src="" alt="" class="voice-agent-avatar">
+    </div>
+    <div class="voice-agent-status">Click to talk with AI Assistant</div>
+    <button class="voice-agent-button">Start Call</button>
+  </div>
+  
+  <script>
+    // Parse URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Helper function to safely decode URL parameters
+    function decodeParam(param) {
+      if (!param) return param;
+      try {
+        return decodeURIComponent(param);
+      } catch (e) {
+        console.warn('Failed to decode parameter:', e);
+        return param;
+      }
+    }
+    
+    // Configuration
+    const config = {
+      agentUrl: urlParams.get('url'),
+      theme: urlParams.get('theme') || 'light',
+      position: urlParams.get('position') || 'bottom-left',
+      agentName: urlParams.has('name') ? decodeParam(urlParams.get('name')) : 
+                (decodeParam(urlParams.get('agentName') || urlParams.get('agent')) || 'AI Assistant'),
+      minimized: urlParams.get('minimized') === 'true',
+      voiceId: urlParams.get('voice'),
+      corpusId: urlParams.get('corpus'),
+      systemPrompt: null, // We'll set this more carefully below
+      // Use a person silhouette SVG as fallback
+      avatarUrl: urlParams.get('avatar') || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgdmlld0JveD0iMCAwIDgwIDgwIj48Y2lyY2xlIGN4PSI0MCIgY3k9IjQwIiByPSI0MCIgZmlsbD0iIzQyODVmNCIvPjxwYXRoIGQ9Ik00MCwyMCBDMzUsMjAgMzEsMjQgMzEsMjkgQzMxLDM0IDM1LDM4IDQwLDM4IEM0NSwzOCA0OSwzNCA0OSwyOSBDNDksMjQgNDUsMjAgNDAsMjAgWiBNMjUsNTggQzI1LDQ4IDMxLDQ0IDQwLDQ0IEM0OSw0NCA1NSw0OCA1NSw1OCBMNTUsNjAgTDI1LDYwIFoiIGZpbGw9IiNGRkZGRkYiLz48L3N2Zz4='
+    };
+    
+    // First try to get the direct prompt
+    if (urlParams.has('prompt')) {
+      console.log('Found direct prompt parameter, decoding...');
+      config.systemPrompt = decodeParam(urlParams.get('prompt'));
+      console.log('Direct prompt length:', config.systemPrompt ? config.systemPrompt.length : 0);
+      console.log('Direct prompt preview:', config.systemPrompt ? config.systemPrompt.substring(0, 50) + '...' : 'null');
+    }
+    
+    console.log('Initial frame configuration:', {
+      agentName: config.agentName,
+      voiceId: config.voiceId,
+      corpusId: config.corpusId,
+      systemPrompt: config.systemPrompt ? `${config.systemPrompt.length} chars, preview: ${config.systemPrompt.substring(0, 30)}...` : 'null',
+      minimized: config.minimized,
+      theme: config.theme,
+      position: config.position,
+      hasAvatarUrl: !!config.avatarUrl
+    });
+    
+    console.log('URL parameters in frame:', {
+      agentName: urlParams.get('agentName'),
+      agent: urlParams.get('agent'),
+      name: urlParams.get('name'),
+      voice: urlParams.get('voice'),
+      corpus: urlParams.get('corpus'),
+      prompt: urlParams.get('prompt') ? `length: ${urlParams.get('prompt').length}, preview: ${urlParams.get('prompt').substring(0, 30)}...` : 'null',
+      url: urlParams.get('url')
+    });
+    
+    // Extract values from agentUrl if provided
+    if (config.agentUrl) {
+      try {
+        console.log('Parsing agentUrl in frame:', config.agentUrl);
+        const agentUrlObj = new URL(decodeParam(config.agentUrl));
+        const agentParams = new URLSearchParams(agentUrlObj.search);
+        
+        // Log all parameters from agentUrl for debugging
+        console.log('All params from agentUrl:');
+        for (const [key, value] of agentParams.entries()) {
+          console.log(`  ${key}: ${value ? `length: ${value.length}, preview: ${value.substring(0, 30)}...` : 'empty'}`);
+        }
+        
+        // Helper function to doubly decode parameters if needed
+        function getDecodedParam(params, key) {
+          if (!params.has(key)) return null;
+          const value = params.get(key);
+          return decodeParam(value);
+        }
+        
+        // Only override if not directly specified
+        if (!urlParams.has('voice') && agentParams.has('voice')) {
+          config.voiceId = getDecodedParam(agentParams, 'voice');
+        }
+        
+        if (!urlParams.has('agent') && !urlParams.has('name') && !urlParams.has('agentName') && agentParams.has('agent')) {
+          config.agentName = getDecodedParam(agentParams, 'agent');
+        }
+        
+        if (!urlParams.has('corpus') && agentParams.has('corpus')) {
+          config.corpusId = getDecodedParam(agentParams, 'corpus');
+        }
+        
+        // Get system prompt from agentUrl if not already set directly
+        if (!config.systemPrompt && agentParams.has('prompt')) {
+          config.systemPrompt = getDecodedParam(agentParams, 'prompt');
+          console.log('Setting system prompt from agentUrl:');
+          console.log('  Length:', config.systemPrompt ? config.systemPrompt.length : 0);
+          console.log('  Preview:', config.systemPrompt ? config.systemPrompt.substring(0, 50) + '...' : 'null');
+          console.log('  Full prompt:', config.systemPrompt);
+        }
+        
+        if (!urlParams.has('avatar') && agentParams.has('avatar')) {
+          config.avatarUrl = getDecodedParam(agentParams, 'avatar');
+        }
+        
+        console.log('Final extracted config in frame:', {
+          agentName: config.agentName,
+          voiceId: config.voiceId,
+          corpusId: config.corpusId,
+          systemPrompt: config.systemPrompt ? `${config.systemPrompt.length} chars, preview: ${config.systemPrompt.substring(0, 30)}...` : 'null',
+          avatarUrl: config.avatarUrl ? config.avatarUrl.substring(0, 30) + '...' : 'null'
+        });
+      } catch (error) {
+        console.error('Error parsing agentUrl in frame:', error);
+      }
+    }
+    
+    // Initialization function to run once document is loaded
+    function initWidget() {
+      console.log('PROMPT DEBUG: Direct URL param:', urlParams.get('prompt'));
+      if (urlParams.get('prompt')) {
+        console.log('PROMPT DEBUG: Direct URL param length:', urlParams.get('prompt').length);
+        console.log('PROMPT DEBUG: Direct URL param first 50 chars:', urlParams.get('prompt').substring(0, 50));
+      }
+      
+      // Name parameter debugging - more detailed
+      console.log('NAME DEBUG: URL parameters for name:');
+      console.log('  Direct name param exists:', urlParams.has('name'));
+      console.log('  Direct name param value:', urlParams.get('name'));
+      console.log('  agentName param:', urlParams.get('agentName'));
+      console.log('  agent param:', urlParams.get('agent'));
+      console.log('  NAME PRIORITY CHECK:');
+      console.log('    1. name param exists?', urlParams.has('name'));
+      console.log('    2. agentName param exists?', urlParams.has('agentName'));
+      console.log('    3. agent param exists?', urlParams.has('agent'));
+      console.log('  NAME DEBUG: Final name selected:', config.agentName);
+      
+      if (config.agentUrl) {
+        console.log('PROMPT DEBUG: agentUrl:', config.agentUrl);
+        try {
+          const agentUrlObj = new URL(decodeParam(config.agentUrl));
+          const agentParams = new URLSearchParams(agentUrlObj.search);
+          
+          console.log('PROMPT DEBUG: agentUrl prompt param:', agentParams.get('prompt'));
+          if (agentParams.get('prompt')) {
+            console.log('PROMPT DEBUG: agentUrl prompt length:', agentParams.get('prompt').length);
+            console.log('PROMPT DEBUG: agentUrl prompt first 50 chars:', agentParams.get('prompt').substring(0, 50));
+          }
+        } catch (error) {
+          console.error('PROMPT DEBUG: Error parsing agentUrl:', error);
+        }
+      }
+      
+      console.log('PROMPT DEBUG: Final systemPrompt:', config.systemPrompt);
+      if (config.systemPrompt) {
+        console.log('PROMPT DEBUG: Final systemPrompt length:', config.systemPrompt.length);
+        console.log('PROMPT DEBUG: Final systemPrompt first 50 chars:', config.systemPrompt.substring(0, 50));
+      }
+      
+      // Apply theme
+      const widget = document.querySelector('.voice-agent-widget');
+      if (widget) {
+        if (config.theme === 'dark') {
+          widget.classList.add('dark');
+        }
+        
+        // Set initial minimized state based on URL parameter
+        if (config.minimized) {
+          widget.classList.add('minimized');
+        }
+        
+        // Set agent name as data attribute for tooltip
+        widget.setAttribute('data-agent-name', config.agentName);
+        console.log('NAME DEBUG: Set widget data-agent-name attribute to:', config.agentName);
+      }
+      
+      // Update agent name
+      const nameElement = document.querySelector('.voice-agent-name');
+      if (nameElement) {
+        nameElement.textContent = config.agentName;
+        console.log('NAME DEBUG: Set name element text to:', config.agentName);
+      }
+      
+      // Update status text
+      const statusElement = document.querySelector('.voice-agent-status');
+      if (statusElement) {
+        statusElement.textContent = `Click to talk with ${config.agentName}`;
+        console.log('NAME DEBUG: Set status text with name:', config.agentName);
+      }
+      
+      // Load avatar image with better error handling
+      const avatarElement = document.querySelector('.voice-agent-avatar');
+      if (avatarElement) {
+        // Default fallback SVG
+        const fallbackSvg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgdmlld0JveD0iMCAwIDgwIDgwIj48Y2lyY2xlIGN4PSI0MCIgY3k9IjQwIiByPSI0MCIgZmlsbD0iIzQyODVmNCIvPjxwYXRoIGQ9Ik00MCwyMCBDMzUsMjAgMzEsMjQgMzEsMjkgQzMxLDM0IDM1LDM4IDQwLDM4IEM0NSwzOCA0OSwzNCA0OSwyOSBDNDksMjQgNDUsMjAgNDAsMjAgWiBNMjUsNTggQzI1LDQ4IDMxLDQ0IDQwLDQ0IEM0OSw0NCA1NSw0OCA1NSw1OCBMNTUsNjAgTDI1LDYwIFoiIGZpbGw9IiNGRkZGRkYiLz48L3N2Zz4=';
+        
+        // Set up error handler before setting src
+        avatarElement.onerror = function() {
+          console.warn('Failed to load avatar image:', this.src);
+          this.src = fallbackSvg;
+        };
+        
+        // Try to preload the image
+        if (config.avatarUrl) {
+          const tempImg = new Image();
+          tempImg.onload = function() {
+            // If image loads successfully, set it as avatar
+            avatarElement.src = config.avatarUrl;
+          };
+          tempImg.onerror = function() {
+            // If preload fails, use fallback
+            console.warn('Failed to preload avatar image:', config.avatarUrl);
+            avatarElement.src = fallbackSvg;
+          };
+          tempImg.src = config.avatarUrl;
+        } else {
+          // No avatar URL, use fallback
+          avatarElement.src = fallbackSvg;
+        }
+        
+        // Set alt text to agent name
+        avatarElement.alt = config.agentName;
+      }
+      
+      // Set up button event listener
+      const button = document.querySelector('.voice-agent-button');
+      if (button) {
+        button.addEventListener('click', toggleCall);
+      }
+      
+      // Notify parent of size
+      notifyParentOfHeightChange();
+      
+      // Signal to parent that we're loaded
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'iframe_loaded',
+          status: 'ready',
+          config: {
+            agentName: config.agentName,
+            minimized: config.minimized
+          }
+        }, '*');
+      }
+      
+      // For debugging, log the configuration
+      console.log('Widget initialized with config:', {
+        agentName: config.agentName,
+        theme: config.theme,
+        minimized: config.minimized,
+        voiceId: config.voiceId,
+        corpusId: config.corpusId,
+        hasSystemPrompt: !!config.systemPrompt,
+        hasAvatar: !!config.avatarUrl
+      });
+    }
+    
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', initWidget);
+    
+    // Toggle call state
+    let callActive = false;
+    let callSession = null;
+    
+    async function toggleCall() {
+      if (callActive) {
+        endCall();
+      } else {
+        startCall();
+      }
+    }
+    
+    // Start call
+    async function startCall() {
+      // Request microphone permission first
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        microphonePermissionGranted = true;
+        
+        // Stop the stream right away, we'll recreate it when needed
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Now continue with call setup
+        setupCall();
+      } catch (error) {
+        console.error('Microphone permission denied:', error);
+        updateStatus('error', 'Microphone access denied. Please allow microphone access and try again.');
+      }
+    }
+    
+    // Handle call status changes
+    function handleCallStatus(event) {
+      let status;
+      
+      // Try different ways to extract the status
+      if (event?.detail?.status) {
+        status = event.detail.status;
+        console.log('Found status in event.detail.status:', status);
+      } else if (event?.status) {
+        status = event.status;
+        console.log('Found status in event.status:', status);
+      } else if (event?.target?._status) {
+        // Extract from UltravoxSession object
+        status = event.target._status;
+        console.log('Found status in event.target._status:', status);
+      } else if (typeof event === 'object') {
+        // Try to find status in any property of the event
+        console.log('Searching for status in event properties');
+        const propsToCheck = Object.getOwnPropertyNames(event);
+        for (const prop of propsToCheck) {
+          if (prop !== 'target' && typeof event[prop] === 'string') {
+            console.log(`Checking property ${prop}:`, event[prop]);
+            if (['connecting', 'connected', 'disconnected', 'idle', 'error', 'thinking', 'speaking', 'disconnecting', 'listening'].includes(event[prop])) {
+              status = event[prop];
+              console.log(`Found potential status in event.${prop}:`, status);
+              break;
+            }
+          }
+        }
+        
+        // If still not found, try to inspect target deeper
+        if (!status && event.target) {
+          console.log('Inspecting event.target deeper');
+          const targetProps = Object.getOwnPropertyNames(event.target);
+          console.log('Target properties:', targetProps);
+          
+          // Look for status in any property of target
+          for (const prop of targetProps) {
+            if (typeof event.target[prop] === 'string') {
+              console.log(`Checking target.${prop}:`, event.target[prop]);
+              if (['connecting', 'connected', 'disconnected', 'idle', 'error', 'thinking', 'speaking', 'disconnecting', 'listening'].includes(event.target[prop])) {
+                status = event.target[prop];
+                console.log(`Found potential status in event.target.${prop}:`, status);
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      if (!status) {
+        console.log('Status event debug:', {
+          eventType: event?.type || 'unknown',
+          hasDetail: !!event?.detail,
+          hasStatus: !!event?.status,
+          hasTarget: !!event?.target,
+          eventKeys: event ? Object.keys(event) : [],
+          targetKeys: event?.target ? Object.keys(event.target) : [],
+          eventConstructor: event?.constructor?.name,
+          targetConstructor: event?.target?.constructor?.name
+        });
+        console.warn('Could not extract status from event. Using default handling.');
+        return;
+      }
+      
+      console.log('Call status changed:', status);
+      
+      switch (status) {
+        case 'connecting':
+          statusElement.textContent = 'Connecting...';
+          statusElement.className = 'voice-agent-status connecting';
+          buttonElement.textContent = 'Cancel';
+          buttonElement.className = 'voice-agent-button cancel';
+          avatarContainer.classList.add('connecting');
+          
+          // Notify parent frame of connecting state
+          try {
+            window.parent.postMessage({
+              type: 'call_started',
+              status: 'connecting'
+            }, '*');
+          } catch (e) {
+            console.warn('Could not communicate with parent frame', e);
+          }
+          break;
+          
+        case 'thinking':
+          // When agent is thinking, use the active state but show appropriate status
+          updateStatus('thinking');
+          break;
+          
+        case 'speaking':
+          // When agent is speaking, use the active state but activate speaking animation
+          updateStatus('speaking');
+          break;
+          
+        case 'listening':
+          // When agent is listening to user input
+          updateStatus('listening');
+          break;
+          
+        case 'connected':
+        case 'idle':
+          updateStatus('active');
+          break;
+          
+        case 'disconnecting':
+          // When disconnecting, show a transitional state
+          updateStatus('disconnecting');
+          break;
+          
+        case 'disconnected':
+          // Play hangup sound
+          playAudio(AUDIO.hangupSound);
+          
+          // Reset call state
+          callActive = false;
+          callSession = null;
+          
+          // Update UI
+          updateStatus('idle');
+          break;
+          
+        case 'error':
+          const errorMsg = event?.detail?.error || 'An error occurred with the call';
+          updateStatus('error', errorMsg);
+          break;
+          
+        default:
+          console.log('Unhandled call status:', status);
+          // Default to active state for unknown statuses
+          updateStatus('active');
+      }
+    }
+    
+    // Handle transcript events
+    function handleTranscript(event) {
+      console.log('Transcript:', event.detail);
+      
+      // Update avatar speaking animation
+      const avatarContainer = document.querySelector('.voice-agent-avatar-container');
+      if (avatarContainer && callActive) {
+        const transcripts = event.detail.transcripts || [];
+        const lastTranscript = transcripts[transcripts.length - 1];
+        if (lastTranscript && lastTranscript.speaker === 'agent' && !lastTranscript.final) {
+          // Agent is currently speaking - add speaking animation
+          avatarContainer.classList.add('speaking');
+          avatarContainer.classList.remove('active');
+        } else {
+          // Agent is not speaking - remove speaking animation
+          avatarContainer.classList.remove('speaking');
+          avatarContainer.classList.add('active');
+        }
+      }
+    }
+    
+    // Set up call after permissions granted
+    async function setupCall() {
+      try {
+        updateStatus('connecting');
+        
+        // First, double-check the system prompt one more time
+        console.log('System prompt before call setup:', {
+          exists: !!config.systemPrompt,
+          length: config.systemPrompt ? config.systemPrompt.length : 0,
+          start: config.systemPrompt ? config.systemPrompt.substring(0, 30) + '...' : null
+        });
+        
+        // Ensure the system prompt isn't undefined or null
+        if (!config.systemPrompt) {
+          console.warn('System prompt is missing before API call, checking URL parameters again');
+          // Try to get it from URL parameters directly as a last resort
+          const directPrompt = urlParams.get('prompt');
+          if (directPrompt) {
+            config.systemPrompt = decodeParam(directPrompt);
+            console.log('Retrieved system prompt directly from URL:', {
+              length: config.systemPrompt.length,
+              start: config.systemPrompt.substring(0, 30) + '...'
+            });
+          } else if (config.agentUrl) {
+            // Try extracting from agentUrl as a last resort
+            try {
+              const agentUrlObj = new URL(decodeParam(config.agentUrl));
+              const promptParam = agentUrlObj.searchParams.get('prompt');
+              if (promptParam) {
+                config.systemPrompt = decodeParam(promptParam);
+                console.log('Retrieved system prompt from agentUrl:', {
+                  length: config.systemPrompt.length,
+                  start: config.systemPrompt.substring(0, 30) + '...'
+                });
+              }
+            } catch (e) {
+              console.warn('Failed to extract prompt from agentUrl:', e);
+            }
+          } else {
+            console.warn('Could not find system prompt in URL parameters either');
+          }
+        }
+        
+        // Check if the Ultravox SDK is available
+        if (!window.UltravoxSession) {
+          // Try to reload the SDK one more time with both methods
+          let sdkLoaded = false;
+          
+          try {
+            // Try ESM import first
+            const { UltravoxSession } = await import(SDK_ENDPOINTS.esm);
+            window.UltravoxSession = UltravoxSession;
+            patchUltravoxSDK(); // Apply the patch
+            sdkLoaded = true;
+          } catch (esmError) {
+            console.warn('ESM SDK load failed:', esmError);
+            
+            // Try UMD fallback
+            try {
+              await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = SDK_ENDPOINTS.umd;
+                script.async = true;
+                script.onload = () => {
+                  if (window.UltravoxSession) {
+                    console.log('UltravoxSession loaded via UMD fallback');
+                    patchUltravoxSDK(); // Apply the patch
+                    sdkLoaded = true;
+                    resolve();
+                  } else {
+                    reject(new Error('UltravoxSession not found in window after script load'));
+                  }
+                };
+                script.onerror = () => reject(new Error('Failed to load UltravoxSession script'));
+                document.head.appendChild(script);
+                
+                // Set a timeout to avoid hanging forever
+                setTimeout(() => reject(new Error('SDK load timeout')), 5000);
+              });
+            } catch (umdError) {
+              console.error('UMD SDK load failed:', umdError);
+            }
+          }
+          
+          // If both methods failed, show error and direct user to main site
+          if (!sdkLoaded) {
+            const errorMsg = 'The voice assistant cannot load properly on this site due to cross-origin restrictions. ';
+            updateStatus('error', errorMsg + '<a href="' + BASE_DOMAIN + '" target="_blank" style="color: #4285f4;">Click here to use it on our main site.</a>');
+            throw new Error('Ultravox SDK not loaded');
+          }
+        }
+        
+        // Create new call session with proper audio context
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Ensure audio context is resumed (needed for some browsers)
+        if (audioContext.state === 'suspended') {
+          try {
+            await audioContext.resume();
+            console.log('Audio context resumed:', audioContext.state);
+          } catch (err) {
+            console.warn('Failed to resume audio context:', err);
+          }
+        }
+        
+        // Make the audio context globally available for our patches
+        window.globalAudioContext = audioContext;
+        
+        // Create session with our audio context
+        callSession = new window.UltravoxSession({ audioContext });
+        
+        // Double-check that our patch is applied
+        if (window.UltravoxSession.prototype.handleSocketMessage.toString().indexOf('PATCH') === -1) {
+          console.warn('UltravoxSession patch not applied, applying now');
+          patchUltravoxSDK();
+        }
+        
+        // Set up event listeners for all possible status events
+        callSession.addEventListener('status', handleCallStatus);
+        callSession.addEventListener('transcript', handleTranscript);
+        callSession.addEventListener('disconnected', function(event) {
+          console.log('Explicit disconnected event received:', event);
+          // Handle explicit disconnect event
+          playAudio(AUDIO.hangupSound);
+          callActive = false;
+          callSession = null;
+          updateStatus('idle');
+        });
+        callSession.addEventListener('call_ended', function(event) {
+          console.log('Explicit call_ended event received:', event);
+          // Handle explicit call ended event
+          playAudio(AUDIO.hangupSound);
+          callActive = false;
+          callSession = null;
+          updateStatus('idle');
+        });
+        
+        // Extra handling for direct status updates from UltravoxSession
+        // Some versions of SDK might emit status directly rather than in an event
+        if (typeof callSession.onStatusChanged === 'function') {
+          const originalOnStatusChanged = callSession.onStatusChanged;
+          callSession.onStatusChanged = function(status) {
+            console.log('Direct onStatusChanged called with:', status);
+            // Call the original handler
+            originalOnStatusChanged.apply(this, arguments);
+            // Also call our handler with the status
+            updateStatus(status);
+            
+            // Handle disconnection specifically
+            if (status === 'disconnected') {
+              console.log('Disconnected status via onStatusChanged');
+              playAudio(AUDIO.hangupSound);
+              callActive = false;
+              callSession = null;
+            }
+          };
+        }
+        
+        // Also check for _notifyStatusListeners method which might be used internally
+        const originalProto = Object.getPrototypeOf(callSession);
+        if (originalProto && typeof originalProto._notifyStatusListeners === 'function') {
+          const originalNotify = originalProto._notifyStatusListeners;
+          originalProto._notifyStatusListeners = function(status) {
+            console.log('Internal _notifyStatusListeners called with:', status);
+            // Call the original method
+            originalNotify.apply(this, arguments);
+            // Update our UI directly
+            updateStatus(status);
+            
+            // Handle disconnection specifically
+            if (status === 'disconnected') {
+              console.log('Disconnected status via _notifyStatusListeners');
+              playAudio(AUDIO.hangupSound);
+              callActive = false;
+              callSession = null;
+            }
+          };
+        }
+        
+        // Prepare payload with detailed time information
+        const now = new Date();
+        const hour = now.getHours();
+        const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        
+        // Format time with day of week and date in a clean format
+        const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
+        const dateString = now.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric',
+          year: 'numeric',
+          timeZone: timezone 
+        });
+        
+        // Format time manually to ensure no seconds
+        const hour12 = hour % 12 || 12;
+        const minutes = now.getMinutes();
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        
+        // Create time string in format like "three pm" or "three thirty pm"
+        let timeString;
+        if (minutes === 0) {
+          timeString = `${hour12} ${ampm.toLowerCase()}`;
+        } else {
+          timeString = `${hour12} ${minutes < 10 ? 'oh' : ''} ${minutes} ${ampm.toLowerCase()}`;
+        }
+        
+        // Combine into a clean format for display
+        const exactTimeString = timeString;
+        const localTimeString = now.toLocaleString();
+        
+        // Log time debug info
+        console.log('Time debug info:', {
+          localTime: localTimeString,
+          exactTime: exactTimeString,
+          timeOfDay: timeOfDay,
+          dayOfWeek: dayOfWeek,
+          dateString: dateString,
+          hour24: hour,
+          timeZone: timezone
+        });
+        
+        // Prepare payload with all time information
+        const payload = {
+          agentName: config.agentName,
+          voiceId: config.voiceId,
+          corpusId: config.corpusId,
+          systemPrompt: config.systemPrompt,
+          userLocalTimeString: localTimeString,
+          userTimeZone: timezone,
+          // Add additional time context
+          timeOfDay: timeOfDay,
+          dayOfWeek: dayOfWeek,
+          dateString: dateString,
+          exactTimeString: exactTimeString,
+          hour: hour
+        };
+        
+        // Log the full payload for debugging
+        console.log('API payload keys:', Object.keys(payload));
+        console.log('API payload agent name:', payload.agentName);
+        console.log('API payload systemPrompt exists:', !!payload.systemPrompt);
+        if (payload.systemPrompt) {
+          console.log('API payload systemPrompt length:', payload.systemPrompt.length);
+          console.log('API payload systemPrompt preview:', payload.systemPrompt.substring(0, 100) + '...');
+          console.log('API payload systemPrompt full:', payload.systemPrompt);
+        }
+        
+        // Send an API request to get a join URL
+        const response = await fetch(`${BASE_DOMAIN}/webrtc-join-url`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to get join URL:', response.status, errorText);
+          throw new Error(`Failed to get join URL: ${response.status} ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('API response:', data);
+        
+        if (!data.joinUrl) {
+          console.error('Missing join URL in response:', data);
+          throw new Error('No join URL provided in server response');
+        }
+        
+        // Play connection sound
+        playAudio(AUDIO.connectSound);
+        
+        // Join the call
+        await callSession.joinCall(data.joinUrl);
+        
+        // Mark call as active
+        callActive = true;
+        
+        // Update UI for active call
+        updateStatus('active');
+        
+        // Expand the widget if minimized
+        setMinimizedState(false);
+        
+      } catch (error) {
+        console.error('Error starting call:', error);
+        updateStatus('error', 'Failed to start call: ' + error.message);
+      }
+    }
+    
+    // End the call
+    function endCall() {
+      if (callSession) {
+        // Play hangup sound
+        playAudio(AUDIO.hangupSound);
+        
+        // Disconnect the call
+        callSession.disconnect();
+        callSession = null;
+      }
+      
+      // Reset call state
+      callActive = false;
+      
+      // Update UI
+      updateStatus('idle');
+      
+      // Collapse the widget
+      const widgetElement = document.querySelector('.voice-agent-widget');
+      if (widgetElement) {
+        widgetElement.classList.remove('expanded');
+      }
+    }
+    
+    // Update status display
+    function updateStatus(status, errorMessage = '') {
+      const statusElement = document.querySelector('.voice-agent-status');
+      const buttonElement = document.querySelector('.voice-agent-button');
+      const avatarContainer = document.querySelector('.voice-agent-avatar-container');
+      
+      if (!statusElement || !buttonElement || !avatarContainer) return;
+      
+      // First remove all animation classes
+      avatarContainer.classList.remove('connecting', 'active', 'speaking', 'pickup', 'thinking', 'disconnecting', 'listening');
+      
+      // Log status change for debugging
+      console.log(`Status changing from ${callActive ? 'active' : 'inactive'} call to "${status}"`);
+      
+      // Update UI based on status
+      switch (status) {
+        case 'idle':
+          // Reset call-related state if transitioning to idle
+          const wasActive = callActive;
+          if (wasActive) {
+            console.log('Call was active, resetting state');
+            callActive = false;
+            // We only null out callSession here if it wasn't already done in handleCallStatus
+            if (callSession) {
+              console.log('Disconnecting remaining call session');
+              callSession.disconnect();
+              callSession = null;
+            }
+          }
+          
+          statusElement.textContent = `Click to talk with ${config.agentName}`;
+          statusElement.className = 'voice-agent-status idle';
+          buttonElement.textContent = 'Start Call';
+          buttonElement.className = 'voice-agent-button start';
+          buttonElement.disabled = false;
+          
+          // Minimize the widget automatically when call ends
+          if (wasActive) {
+            // Add a small delay to ensure animations complete
+            setTimeout(() => {
+              setMinimizedState(true);
+            }, 500);
+          }
+          
+          // Notify parent frame that call has ended
+          try {
+            window.parent.postMessage({
+              type: 'call_ended',
+              status: 'idle'
+            }, '*');
+          } catch (e) {
+            console.warn('Could not communicate with parent frame', e);
+          }
+          break;
+          
+        case 'connecting':
+          statusElement.textContent = 'Connecting...';
+          statusElement.className = 'voice-agent-status connecting';
+          buttonElement.textContent = 'Cancel';
+          buttonElement.className = 'voice-agent-button cancel';
+          avatarContainer.classList.add('connecting');
+          
+          // Notify parent frame of connecting state
+          try {
+            window.parent.postMessage({
+              type: 'call_started',
+              status: 'connecting'
+            }, '*');
+          } catch (e) {
+            console.warn('Could not communicate with parent frame', e);
+          }
+          break;
+          
+        case 'active':
+          statusElement.textContent = 'Call in progress';
+          statusElement.className = 'voice-agent-status active';
+          buttonElement.textContent = 'End Call';
+          buttonElement.className = 'voice-agent-button end';
+          buttonElement.disabled = false;
+          avatarContainer.classList.add('active');
+          
+          // Play pickup animation once if this is the first time reaching active state
+          if (!callActive) {
+            avatarContainer.classList.add('pickup');
+            // Make sure the pickup animation is more visible
+            setTimeout(() => {
+              avatarContainer.classList.remove('pickup');
+              // Keep the active state after pickup animation ends
+              avatarContainer.classList.add('active');
+            }, 1200);
+          }
+          
+          // Notify parent frame of active call
+          try {
+            window.parent.postMessage({
+              type: 'call_started',
+              status: 'active'
+            }, '*');
+          } catch (e) {
+            console.warn('Could not communicate with parent frame', e);
+          }
+          break;
+          
+        case 'thinking':
+          statusElement.textContent = 'Thinking...';
+          statusElement.className = 'voice-agent-status thinking';
+          buttonElement.textContent = 'End Call';
+          buttonElement.className = 'voice-agent-button end';
+          buttonElement.disabled = false;
+          avatarContainer.classList.add('active');
+          
+          // Notify parent frame of active call
+          try {
+            window.parent.postMessage({
+              type: 'call_started',
+              status: 'thinking'
+            }, '*');
+          } catch (e) {
+            console.warn('Could not communicate with parent frame', e);
+          }
+          break;
+          
+        case 'speaking':
+          statusElement.textContent = 'Speaking...';
+          statusElement.className = 'voice-agent-status speaking';
+          buttonElement.textContent = 'End Call';
+          buttonElement.className = 'voice-agent-button end';
+          buttonElement.disabled = false;
+          avatarContainer.classList.add('speaking');
+          
+          // Notify parent frame of active call
+          try {
+            window.parent.postMessage({
+              type: 'call_started',
+              status: 'speaking'
+            }, '*');
+          } catch (e) {
+            console.warn('Could not communicate with parent frame', e);
+          }
+          break;
+          
+        case 'listening':
+          statusElement.textContent = 'Listening...';
+          statusElement.className = 'voice-agent-status listening';
+          buttonElement.textContent = 'End Call';
+          buttonElement.className = 'voice-agent-button end';
+          buttonElement.disabled = false;
+          avatarContainer.classList.add('active');
+          
+          // Notify parent frame of active call
+          try {
+            window.parent.postMessage({
+              type: 'call_started',
+              status: 'listening'
+            }, '*');
+          } catch (e) {
+            console.warn('Could not communicate with parent frame', e);
+          }
+          break;
+          
+        case 'disconnecting':
+          statusElement.textContent = 'Disconnecting...';
+          statusElement.className = 'voice-agent-status disconnecting';
+          buttonElement.textContent = 'End Call';
+          buttonElement.className = 'voice-agent-button end';
+          buttonElement.disabled = true;
+          avatarContainer.classList.add('active');
+          break;
+          
+        case 'error':
+          // Use innerHTML for error messages that might contain HTML
+          statusElement.innerHTML = errorMessage || 'Error occurred';
+          statusElement.className = 'voice-agent-status error';
+          buttonElement.textContent = 'Retry';
+          buttonElement.className = 'voice-agent-button retry';
+          buttonElement.disabled = false;
+          break;
+      }
+      
+      // Notify parent frame of status changes
+      try {
+        window.parent.postMessage({
+          type: status === 'idle' ? 'minimize' : 'expand'
+        }, '*');
+      } catch (e) {
+        console.warn('Could not communicate with parent frame', e);
+      }
+    }
+    
+    // Helper function to play audio
+    function playAudio(url) {
+      try {
+        // Check if we have a cached audio element
+        if (!window.audioCache) {
+          window.audioCache = {};
+        }
+        
+        // Use cached audio if available, otherwise create and cache it
+        if (!window.audioCache[url]) {
+          const audio = new Audio();
+          
+          // Set up error handling
+          audio.onerror = (e) => {
+            console.warn(`Audio failed to load: ${url}`, e);
+            delete window.audioCache[url]; // Remove from cache if it fails
+          };
+          
+          // Preload the audio
+          audio.src = url;
+          audio.load();
+          
+          // Store in cache
+          window.audioCache[url] = audio;
+        }
+        
+        // Play the audio (clone it for overlapping sounds)
+        const audioToPlay = window.audioCache[url].cloneNode();
+        
+        // Set lower volume for hangup sound specifically
+        if (url === AUDIO.hangupSound) {
+          audioToPlay.volume = 0.3;
+        }
+        
+        audioToPlay.play().catch(err => {
+          console.warn('Could not play audio:', err);
+          // Recreate the audio element for next time
+          delete window.audioCache[url];
+        });
+      } catch (e) {
+        console.warn('Error playing audio:', e);
+      }
+    }
+    
+    // Function to notify parent window of height changes
+    function notifyParentOfHeightChange() {
+      const height = document.body.scrollHeight;
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'resize',
+          height: height
+        }, '*');
+      }
+    }
+    
+    // Observer to watch for DOM changes and resize accordingly
+    const resizeObserver = new ResizeObserver(entries => {
+      notifyParentOfHeightChange();
+    });
+    
+    // Wait for DOM to be loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Start observing the widget container
+      const widgetContainer = document.querySelector('.voice-agent-widget');
+      if (widgetContainer) {
+        resizeObserver.observe(widgetContainer);
+      }
+      
+      // Initial height notification
+      setTimeout(notifyParentOfHeightChange, 100);
+    });
+    
+    // Whenever transcript visibility changes, notify parent
+    function updateTranscriptVisibility(visible) {
+      // Function kept for compatibility but does nothing now
+      notifyParentOfHeightChange();
+    }
+
+    function handleCallStatusEvent(data) {
+      switch (data.status) {
+        case 'started':
+          updateCallStatus('Call in progress...');
+          document.getElementById('call-button').textContent = 'End Call';
+          document.getElementById('call-button').dataset.action = 'end';
+          break;
+        case 'ended':
+          updateCallStatus('Call ended');
+          document.getElementById('call-button').textContent = 'Start Call';
+          document.getElementById('call-button').dataset.action = 'start';
+          break;
+        case 'error':
+          updateCallStatus(`Error: ${data.message || 'Unknown error'}`, true);
+          document.getElementById('call-button').textContent = 'Start Call';
+          document.getElementById('call-button').dataset.action = 'start';
+          break;
+        default:
+          updateCallStatus(data.message || 'Unknown status');
+      }
+      
+      // Notify parent of height change after status update
+      notifyParentOfHeightChange();
+    }
+
+    // Function to update call status display
+    function updateCallStatus(status, isError = false) {
+      const statusElement = document.getElementById('call-status');
+      if (statusElement) {
+        statusElement.textContent = status;
+        if (isError) {
+          statusElement.style.color = '#e53935';
+        } else {
+          statusElement.style.color = '#333333';
+        }
+      }
+      
+      // Notify parent of height change after status update
+      setTimeout(notifyParentOfHeightChange, 50);
+    }
+
+    // Function to update transcript
+    function updateTranscript(message, isAgent = false) {
+      // Function kept for compatibility but does nothing now
+      console.log('Transcript update (disabled):', message);
+    }
+
+    // Additional script to handle minimized state messaging
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type) {
+        switch (event.data.type) {
+          case 'minimize':
+            setMinimizedState(true);
+            break;
+          case 'expand':
+            setMinimizedState(false);
+            break;
+        }
+      }
+    });
+    
+    // Function to handle minimized state
+    function setMinimizedState(minimized) {
+      const widget = document.querySelector('.voice-agent-widget');
+      if (!widget) return;
+      
+      if (minimized) {
+        widget.classList.add('minimized');
+      } else {
+        widget.classList.remove('minimized');
+      }
+      
+      // Notify parent of the change for iframe resizing
+      notifyParentOfHeightChange();
+    }
+    
+    // Function to toggle minimized state
+    function toggleWidget() {
+      const widget = document.querySelector('.voice-agent-widget');
+      if (!widget) return;
+      
+      const isCurrentlyMinimized = widget.classList.contains('minimized');
+      setMinimizedState(!isCurrentlyMinimized);
+      
+      // Notify parent for resizing the iframe
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'toggle'
+        }, '*');
+      }
+    }
+  </script>
+</body>
+</html> 

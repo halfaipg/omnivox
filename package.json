@@ -7,15 +7,22 @@
   "scripts": {
     "start": "nodemon --watch .env server.js",
     "dev": "nodemon --watch .env server.js",
-    "setup-tools": "node scripts/setup-tools.js"
+    "setup-tools": "node scripts/setup-tools.js",
+    "outbound-call": "node scripts/outbound-call.js"
   },
   "dependencies": {
     "axios": "^1.6.7",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-fileupload": "^1.5.1",
+    "express-session": "^1.18.1",
     "form-data": "^4.0.2",
+    "google-auth-library": "^9.15.1",
+    "googleapis": "^146.0.0",
+    "multer": "^1.4.5-lts.1",
     "node-fetch": "^3.3.2",
+    "sharp": "^0.33.5",
     "telnyx": "^1.25.0",
     "twilio": "^5.4.0",
     "ws": "^8.16.0"

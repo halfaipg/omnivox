@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ultravox Voice Agent Widget Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #0066cc;
+      margin-bottom: 20px;
+    }
+    .card {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button {
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #0052a3;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .parameters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .parameter {
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    input, select {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ultravox Voice Agent Widget Test</h1>
+  
+  <div class="card">
+    <h2>Widget Configuration</h2>
+    <div class="parameters">
+      <div class="parameter">
+        <label for="agent-name">Agent Name</label>
+        <input type="text" id="agent-name" value="Test Agent">
+      </div>
+      <div class="parameter">
+        <label for="voice-id">Voice ID</label>
+        <input type="text" id="voice-id" value="anthropic/claude-2">
+      </div>
+      <div class="parameter">
+        <label for="corpus-id">Corpus ID</label>
+        <input type="text" id="corpus-id" value="test-corpus">
+      </div>
+      <div class="parameter">
+        <label for="system-prompt">System Prompt</label>
+        <input type="text" id="system-prompt" value="You are a helpful AI assistant.">
+      </div>
+      <div class="parameter">
+        <label for="theme">Theme</label>
+        <select id="theme">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <div class="parameter">
+        <label for="position">Position</label>
+        <select id="position">
+          <option value="bottom-right">Bottom Right</option>
+          <option value="bottom-left">Bottom Left</option>
+          <option value="top-right">Top Right</option>
+          <option value="top-left">Top Left</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="btn-group">
+      <button id="add-widget">Add Widget</button>
+      <button id="remove-widget">Remove Widget</button>
+    </div>
+  </div>
+  
+  <div class="card">
+    <h2>Test Results</h2>
+    <div id="test-results">
+      <p>Click "Add Widget" to add the widget to the page.</p>
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const addWidgetBtn = document.getElementById('add-widget');
+      const removeWidgetBtn = document.getElementById('remove-widget');
+      const testResults = document.getElementById('test-results');
+      
+      let widgetScript = null;
+      
+      // Add widget function
+      addWidgetBtn.addEventListener('click', function() {
+        if (widgetScript) {
+          testResults.innerHTML = '<p>Widget already added. Remove it first to add a new one.</p>';
+          return;
+        }
+        
+        try {
+          // Get configuration values
+          const agentName = document.getElementById('agent-name').value || 'Test Agent';
+          const voiceId = document.getElementById('voice-id').value || 'anthropic/claude-2';
+          const corpusId = document.getElementById('corpus-id').value || 'test-corpus';
+          const systemPrompt = document.getElementById('system-prompt').value || 'You are a helpful AI assistant.';
+          const theme = document.getElementById('theme').value || 'light';
+          const position = document.getElementById('position').value || 'bottom-right';
+          
+          // Create script with query parameters
+          widgetScript = document.createElement('script');
+          widgetScript.id = 'voice-agent-widget-script';
+          widgetScript.src = `/widget/voice-agent-widget.js?voice=${encodeURIComponent(voiceId)}&agent=${encodeURIComponent(agentName)}&corpus=${encodeURIComponent(corpusId)}&prompt=${encodeURIComponent(systemPrompt)}&theme=${theme}&position=${position}`;
+          
+          // Add event listeners for script loading
+          widgetScript.onload = () => {
+            testResults.innerHTML = '<p class="success">✅ Widget script loaded successfully!</p>';
+          };
+          
+          widgetScript.onerror = (error) => {
+            testResults.innerHTML = `<p class="error">❌ Error loading widget script: ${error.message || 'Unknown error'}</p>`;
+            document.head.removeChild(widgetScript);
+            widgetScript = null;
+          };
+          
+          // Add the script to the page
+          document.head.appendChild(widgetScript);
+        } catch (error) {
+          testResults.innerHTML = `<p class="error">❌ Error adding widget: ${error.message}</p>`;
+        }
+      });
+      
+      // Remove widget function
+      removeWidgetBtn.addEventListener('click', function() {
+        if (!widgetScript) {
+          testResults.innerHTML = '<p>No widget found to remove.</p>';
+          return;
+        }
+        
+        try {
+          // Remove the script
+          document.head.removeChild(widgetScript);
+          widgetScript = null;
+          
+          // Remove the widget from DOM if it exists
+          const widgetContainer = document.querySelector('.voice-agent-widget-container');
+          if (widgetContainer) {
+            widgetContainer.remove();
+          }
+          
+          testResults.innerHTML = '<p>Widget removed successfully.</p>';
+        } catch (error) {
+          testResults.innerHTML = `<p class="error">❌ Error removing widget: ${error.message}</p>`;
+        }
+      });
+    });
+  </script>
+</body>
+</html> 

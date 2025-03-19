@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Omnivox Integration API Documentation</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+  <style>
+    :root {
+      --primary-color: #4285f4;
+      --secondary-color: #34a853;
+      --bg-color: #f8f9fa;
+      --text-color: #333;
+      --code-bg: #f5f5f5;
+      --border-color: #e0e0e0;
+      --header-bg: #4285f4;
+      --method-get: #4285f4;
+      --method-post: #34a853;
+      --method-put: #fbbc05;
+      --method-delete: #ea4335;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: var(--text-color);
+      background-color: var(--bg-color);
+    }
+
+    header {
+      background-color: var(--header-bg);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .container {
+      display: flex;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0;
+    }
+
+    .sidebar {
+      width: 250px;
+      background-color: white;
+      padding:.5rem;
+      border-right: 1px solid var(--border-color);
+      height: calc(100vh - 100px);
+      overflow-y: auto;
+      position: sticky;
+      top: 0;
+    }
+
+    .content {
+      flex: 1;
+      padding: 2rem;
+      max-width: calc(100% - 250px);
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 0.5rem;
+      text-decoration: none;
+      color: var(--text-color);
+      margin-bottom: 0.25rem;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+
+    .sidebar a:hover {
+      background-color: var(--bg-color);
+      color: var(--primary-color);
+    }
+
+    h1 {
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      margin: 2rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    h3 {
+      margin: 1.5rem 0 1rem;
+      color: var(--primary-color);
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    pre {
+      background-color: var(--code-bg);
+      border-radius: 4px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+
+    table th, table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    table th {
+      background-color: var(--bg-color);
+    }
+
+    .section {
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .method {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      color: white;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+      min-width: 60px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .get {
+      background-color: var(--method-get);
+    }
+
+    .post {
+      background-color: var(--method-post);
+    }
+
+    .put {
+      background-color: var(--method-put);
+    }
+
+    .delete {
+      background-color: var(--method-delete);
+    }
+
+    .endpoint-title {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .endpoint-path {
+      font-family: 'Courier New', Courier, monospace;
+      margin-left: 0.5rem;
+    }
+
+    .param-table td:first-child {
+      font-weight: bold;
+      width: 30%;
+    }
+
+    .param-required {
+      color: var(--method-delete);
+      margin-left: 0.25rem;
+    }
+
+    .category-header {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin: 0.5rem 0;
+      color: var(--primary-color);
+    }
+
+    .response-example {
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Omnivox Integration API Documentation</h1>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="category-header">Core Functions</div>
+      <a href="#overview">Overview</a>
+      <a href="#authentication">Authentication</a>
+      <a href="#health">Health Check</a>
+      <a href="#config">Configuration</a>
+      
+      <div class="category-header">Call Management</div>
+      <a href="#incoming-call">Incoming Call</a>
+      <a href="#outgoing-call">Outgoing Call</a>
+      <a href="#direct-connect">Direct Connect</a>
+      <a href="#call-status">Call Status</a>
+      <a href="#callback">Callback</a>
+      <a href="#webrtc-join">WebRTC Join URL</a>
+      
+      <div class="category-header">Voice Management</div>
+      <a href="#voices">List Voices</a>
+      <a href="#delete-voice">Delete Voice</a>
+      <a href="#clone-voice">Clone Voice</a>
+      
+      <div class="category-header">Knowledge Base</div>
+      <a href="#list-corpora">List Corpora</a>
+      <a href="#create-corpus">Create Corpus</a>
+      <a href="#delete-corpus">Delete Corpus</a>
+      
+      <div class="category-header">Calendar Integration</div>
+      <a href="#calendar-availability">Calendar Availability</a>
+      <a href="#calendar-schedule">Schedule Event</a>
+      <a href="#microsoft-auth">Microsoft Auth</a>
+      
+      <div class="category-header">Miscellaneous</div>
+      <a href="#system-prompt">System Prompt</a>
+      <a href="#avatar-management">Avatar Management</a>
+    </aside>
+
+    <main class="content">
+      <section id="overview" class="section">
+        <h2>Overview</h2>
+        <p>
+          This documentation provides details about the Omnivox Integration API, which allows you to interact with the 
+          Omnivox voice agent system. The API enables you to manage calls, voices, knowledge bases, calendar integrations, 
+          and more.
+        </p>
+        <p>
+          The API is designed to be used by developers who want to integrate Omnivox voice agents into their applications.
+        </p>
+      </section>
+
+      <section id="authentication" class="section">
+        <h2>Authentication</h2>
+        <p>
+          Most API endpoints require authentication. You can authenticate by providing an API key in the 
+          <code>X-API-Key</code> header.
+        </p>
+        <pre><code class="language-javascript">
+fetch('/api/endpoint', {
+  headers: {
+    'X-API-Key': 'your-api-key-here'
+  }
+})
+        </code></pre>
+      </section>
+
+      <section id="health" class="section">
+        <h2>Health Check</h2>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/health</span>
+        </div>
+        <p>
+          Check if the API is running properly.
+        </p>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "status": "ok",
+  "timestamp": "2023-06-01T12:00:00Z"
+}
+        </code></pre>
+      </section>
+
+      <section id="config" class="section">
+        <h2>Configuration</h2>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/config</span>
+        </div>
+        <p>
+          Retrieve the current configuration settings.
+        </p>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "use_telnyx": true,
+  "use_twilio": false,
+  "version": "1.0.0"
+}
+        </code></pre>
+      </section>
+
+      <!-- Call Management -->
+      <section id="incoming-call" class="section">
+        <h2>Incoming Call</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/incoming</span>
+        </div>
+        <p>
+          Handle an incoming call from Twilio or Telnyx.
+        </p>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>CallSid<span class="param-required">*</span></td>
+            <td>The Twilio Call SID or Telnyx Call Control ID</td>
+          </tr>
+          <tr>
+            <td>From<span class="param-required">*</span></td>
+            <td>The caller's phone number</td>
+          </tr>
+          <tr>
+            <td>To<span class="param-required">*</span></td>
+            <td>The recipient's phone number</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <p>Returns TwiML or TeXML instructions for call handling.</p>
+      </section>
+
+      <section id="outgoing-call" class="section">
+        <h2>Outgoing Call</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/outgoing</span>
+        </div>
+        <p>
+          Initiate an outgoing call.
+        </p>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>to<span class="param-required">*</span></td>
+            <td>The phone number to call</td>
+          </tr>
+          <tr>
+            <td>from</td>
+            <td>The caller's phone number</td>
+          </tr>
+          <tr>
+            <td>voice</td>
+            <td>The voice ID to use for the call</td>
+          </tr>
+          <tr>
+            <td>agent</td>
+            <td>The agent's name</td>
+          </tr>
+          <tr>
+            <td>corpus</td>
+            <td>The corpus ID to use for RAG</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "call_id": "abc123",
+  "status": "initiated"
+}
+        </code></pre>
+      </section>
+
+      <section id="direct-connect" class="section">
+        <h2>Direct Connect</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/direct-connect/:callId</span>
+        </div>
+        <p>
+          Directly connect an Omnivox session to a call.
+        </p>
+        <h3>URL Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>callId<span class="param-required">*</span></td>
+            <td>The ID of the call to connect to</td>
+          </tr>
+        </table>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>wsUrl<span class="param-required">*</span></td>
+            <td>The WebSocket URL for the Omnivox session</td>
+          </tr>
+          <tr>
+            <td>sessionId<span class="param-required">*</span></td>
+            <td>The Omnivox session ID</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "call_id": "abc123",
+  "message": "Connected to call"
+}
+        </code></pre>
+      </section>
+
+      <section id="call-status" class="section">
+        <h2>Call Status</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/call-status</span>
+        </div>
+        <p>
+          Receive call status updates from Twilio or Telnyx.
+        </p>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>CallSid<span class="param-required">*</span></td>
+            <td>The call SID or control ID</td>
+          </tr>
+          <tr>
+            <td>CallStatus<span class="param-required">*</span></td>
+            <td>The current status of the call</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <p>200 OK</p>
+      </section>
+
+      <section id="callback" class="section">
+        <h2>Callback</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/callback</span>
+        </div>
+        <p>
+          Receive callbacks from Twilio or Telnyx.
+        </p>
+        <h3>Response</h3>
+        <p>200 OK</p>
+      </section>
+
+      <section id="webrtc-join" class="section">
+        <h2>WebRTC Join URL</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/webrtc-join-url</span>
+        </div>
+        <p>
+          Get a URL for joining a WebRTC call with Omnivox.
+        </p>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>voice</td>
+            <td>The voice ID to use</td>
+          </tr>
+          <tr>
+            <td>agent</td>
+            <td>The agent's name</td>
+          </tr>
+          <tr>
+            <td>corpus</td>
+            <td>The corpus ID for RAG</td>
+          </tr>
+          <tr>
+            <td>prompt</td>
+            <td>The system prompt</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "join_url": "wss://Omnivox-server.com/join/abc123",
+  "session_id": "session-xyz"
+}
+        </code></pre>
+      </section>
+
+      <!-- Voice Management -->
+      <section id="voices" class="section">
+        <h2>List Voices</h2>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/voices</span>
+        </div>
+        <p>
+          List all available voices for the Omnivox system.
+        </p>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "results": [
+    {
+      "id": "voice-123",
+      "name": "John",
+      "gender": "male",
+      "preview_url": "https://example.com/preview/voice-123.mp3"
+    },
+    {
+      "id": "voice-456",
+      "name": "Mary",
+      "gender": "female",
+      "preview_url": "https://example.com/preview/voice-456.mp3"
+    }
+  ]
+}
+        </code></pre>
+      </section>
+
+      <section id="delete-voice" class="section">
+        <h2>Delete Voice</h2>
+        <div class="endpoint-title">
+          <span class="method delete">DELETE</span>
+          <span class="endpoint-path">/voice/:voiceId</span>
+        </div>
+        <p>
+          Delete a specific voice from the system.
+        </p>
+        <h3>URL Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>voiceId<span class="param-required">*</span></td>
+            <td>The ID of the voice to delete</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "message": "Voice deleted successfully"
+}
+        </code></pre>
+      </section>
+
+      <section id="clone-voice" class="section">
+        <h2>Clone Voice</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/clone-voice</span>
+        </div>
+        <p>
+          Clone a voice from an audio sample.
+        </p>
+        <h3>Request Parameters (multipart/form-data)</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>audio<span class="param-required">*</span></td>
+            <td>Audio file to clone (MP3 or WAV)</td>
+          </tr>
+          <tr>
+            <td>name<span class="param-required">*</span></td>
+            <td>Name for the cloned voice</td>
+          </tr>
+          <tr>
+            <td>gender</td>
+            <td>Gender of the voice (male/female)</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "voice_id": "voice-789",
+  "message": "Voice cloned successfully"
+}
+        </code></pre>
+      </section>
+
+      <!-- Knowledge Base -->
+      <section id="list-corpora" class="section">
+        <h2>List Corpora</h2>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/list-corpora</span>
+        </div>
+        <p>
+          List all available knowledge base corpora.
+        </p>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "corpora": [
+    {
+      "id": "corpus-123",
+      "name": "Product Manual",
+      "document_count": 15,
+      "created_at": "2023-05-15T10:30:00Z"
+    },
+    {
+      "id": "corpus-456",
+      "name": "FAQ",
+      "document_count": 50,
+      "created_at": "2023-06-01T08:15:00Z"
+    }
+  ]
+}
+        </code></pre>
+      </section>
+
+      <section id="create-corpus" class="section">
+        <h2>Create Corpus</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/create-corpus</span>
+        </div>
+        <p>
+          Create a new knowledge base corpus.
+        </p>
+        <h3>Request Parameters (multipart/form-data)</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>name<span class="param-required">*</span></td>
+            <td>Name of the corpus</td>
+          </tr>
+          <tr>
+            <td>files<span class="param-required">*</span></td>
+            <td>One or more files to add to the corpus (PDF, TXT, DOCX, etc.)</td>
+          </tr>
+          <tr>
+            <td>description</td>
+            <td>Description of the corpus</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "corpus_id": "corpus-789",
+  "message": "Corpus created successfully"
+}
+        </code></pre>
+      </section>
+
+      <section id="delete-corpus" class="section">
+        <h2>Delete Corpus</h2>
+        <div class="endpoint-title">
+          <span class="method delete">DELETE</span>
+          <span class="endpoint-path">/corpus/:corpusId</span>
+        </div>
+        <p>
+          Delete a specific knowledge base corpus.
+        </p>
+        <h3>URL Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>corpusId<span class="param-required">*</span></td>
+            <td>The ID of the corpus to delete</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "message": "Corpus deleted successfully"
+}
+        </code></pre>
+      </section>
+
+      <!-- Calendar Integration -->
+      <section id="calendar-availability" class="section">
+        <h2>Calendar Availability</h2>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/api/calendar/availability</span>
+        </div>
+        <p>
+          Get available time slots from Google or Microsoft Calendar.
+        </p>
+        <h3>Query Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>startDate</td>
+            <td>Start date for availability check (default: today)</td>
+          </tr>
+          <tr>
+            <td>days</td>
+            <td>Number of days to check (default: 7)</td>
+          </tr>
+          <tr>
+            <td>provider</td>
+            <td>Calendar provider (google or microsoft, default: google)</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "slots": [
+    {
+      "date": "2023-06-01",
+      "day": "Thursday",
+      "slots": [
+        { "start": "09:00", "end": "09:30" },
+        { "start": "10:00", "end": "10:30" }
+      ]
+    },
+    {
+      "date": "2023-06-02",
+      "day": "Friday",
+      "slots": [
+        { "start": "11:00", "end": "11:30" },
+        { "start": "14:00", "end": "14:30" }
+      ]
+    }
+  ]
+}
+        </code></pre>
+      </section>
+
+      <section id="calendar-schedule" class="section">
+        <h2>Schedule Event</h2>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/api/calendar/schedule</span>
+        </div>
+        <p>
+          Schedule a new event on Google or Microsoft Calendar.
+        </p>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>summary<span class="param-required">*</span></td>
+            <td>Event title</td>
+          </tr>
+          <tr>
+            <td>startDateTime<span class="param-required">*</span></td>
+            <td>Start date and time (ISO format)</td>
+          </tr>
+          <tr>
+            <td>endDateTime<span class="param-required">*</span></td>
+            <td>End date and time (ISO format)</td>
+          </tr>
+          <tr>
+            <td>description</td>
+            <td>Event description</td>
+          </tr>
+          <tr>
+            <td>attendees</td>
+            <td>Array of email addresses for attendees</td>
+          </tr>
+          <tr>
+            <td>provider</td>
+            <td>Calendar provider (google or microsoft, default: google)</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "event": {
+    "id": "event123",
+    "summary": "Product Demo",
+    "start": "2023-06-01T09:00:00Z",
+    "end": "2023-06-01T09:30:00Z"
+  }
+}
+        </code></pre>
+      </section>
+
+      <section id="microsoft-auth" class="section">
+        <h2>Microsoft Authentication</h2>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/auth/microsoft</span>
+        </div>
+        <p>
+          Initiate Microsoft OAuth authentication flow.
+        </p>
+        <h3>Response</h3>
+        <p>Redirects to Microsoft OAuth consent screen.</p>
+        
+        <h3>OAuth Callback</h3>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/oauth2callback-microsoft</span>
+        </div>
+        <p>
+          Callback endpoint for Microsoft OAuth flow.
+        </p>
+        <h3>Query Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>code<span class="param-required">*</span></td>
+            <td>Authorization code from Microsoft</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <p>Redirects to application with authentication result.</p>
+      </section>
+
+      <!-- Miscellaneous -->
+      <section id="system-prompt" class="section">
+        <h2>System Prompt</h2>
+        <div class="endpoint-title">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/system-prompt</span>
+        </div>
+        <p>
+          Get the default system prompt used for Omnivox agents.
+        </p>
+        <h3>Query Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>isOutbound</td>
+            <td>Whether the prompt is for an outbound call (true/false)</td>
+          </tr>
+          <tr>
+            <td>agentName</td>
+            <td>The name of the agent</td>
+          </tr>
+          <tr>
+            <td>userEmail</td>
+            <td>The user's email address</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "prompt": "You are an AI assistant named [agentName]. Your goal is to assist callers in a friendly and helpful manner..."
+}
+        </code></pre>
+      </section>
+
+      <section id="avatar-management" class="section">
+        <h2>Avatar Management</h2>
+        
+        <h3>Upload Avatar</h3>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/upload-avatar</span>
+        </div>
+        <p>
+          Upload an avatar image.
+        </p>
+        <h3>Request Parameters (multipart/form-data)</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>avatar<span class="param-required">*</span></td>
+            <td>Image file to upload</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "avatarUrl": "/uploads/avatars/avatar-123.jpg"
+}
+        </code></pre>
+        
+        <h3>Crop Avatar</h3>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/crop-avatar</span>
+        </div>
+        <p>
+          Crop an existing avatar image.
+        </p>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>imagePath<span class="param-required">*</span></td>
+            <td>Path to the image to crop</td>
+          </tr>
+          <tr>
+            <td>cropData<span class="param-required">*</span></td>
+            <td>JSON object with crop coordinates (x, y, width, height)</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "avatarUrl": "/uploads/avatars/cropped-avatar-123.jpg"
+}
+        </code></pre>
+        
+        <h3>Process Avatar</h3>
+        <div class="endpoint-title">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/process-avatar</span>
+        </div>
+        <p>
+          Process an avatar image (resize, optimize, etc.).
+        </p>
+        <h3>Request Parameters</h3>
+        <table class="param-table">
+          <tr>
+            <th>Parameter</th>
+            <th>Description</th>
+          </tr>
+          <tr>
+            <td>avatarData<span class="param-required">*</span></td>
+            <td>Base64-encoded image data</td>
+          </tr>
+        </table>
+        <h3>Response</h3>
+        <pre><code class="language-json">
+{
+  "success": true,
+  "avatarUrl": "data:image/jpeg;base64,..."
+}
+        </code></pre>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Smooth scrolling for anchor links
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          const targetId = this.getAttribute('href');
+          const targetElement = document.querySelector(targetId);
+          
+          if (targetElement) {
+            window.scrollTo({
+              top: targetElement.offsetTop - 20,
+              behavior: 'smooth'
+            });
+          }
+        });
+      });
+      
+      // Highlight current section in sidebar
+      const sections = document.querySelectorAll('.section');
+      const sidebarLinks = document.querySelectorAll('.sidebar a');
+      
+      window.addEventListener('scroll', function() {
+        let current = '';
+        
+        sections.forEach(section => {
+          const sectionTop = section.offsetTop;
+          const sectionHeight = section.clientHeight;
+          
+          if (pageYOffset >= sectionTop - 100) {
+            current = '#' + section.getAttribute('id');
+          }
+        });
+        
+        sidebarLinks.forEach(link => {
+          link.style.fontWeight = link.getAttribute('href') === current ? 'bold' : 'normal';
+          link.style.color = link.getAttribute('href') === current ? 'var(--primary-color)' : 'var(--text-color)';
+        });
+      });
+    });
+  </script>
+</body>
+</html> 

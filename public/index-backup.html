@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title></title>
+    <!-- External CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Initial config script -->
+    <script>
+        // Immediately fetch config and update title
+        (async function() {
+            try {
+                const response = await fetch('/config');
+                const config = await response.json();
+                if (config.appName) {
+                    document.title = config.appName;
+                }
+            } catch (error) {
+                console.error('Error fetching initial config:', error);
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="header">
+        <div class="theme-switch-wrapper">
+            <div class="theme-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </div>
+            <label class="theme-switch">
+                <input type="checkbox" id="theme-toggle">
+                <span class="slider"></span>
+            </label>
+            <div class="theme-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+            </div>
+        </div>
+        <div class="logo-container">
+            <img src="favicon.svg" alt="Logo" class="logo">
+        </div>
+        <h1>Ultravox Demo</h1>
+        <p class="description">Explore the capabilities of Fixie's real-time audio voice model.</p>
+    </div>
+    
+    <div class="container" id="status-container">
+        <div id="serverStatus" class="offline">Checking server status...</div>
+    </div>
+    
+    <div class="container">
+        <div class="tabs">
+            <button class="tab-button" data-tab="text-tab">Text</button>
+            <button class="tab-button" data-tab="speech-tab">Speech</button>
+            <button class="tab-button" data-tab="outbound-tab">Outbound Call</button>
+            <button class="tab-button" data-tab="webrtc-tab">Web Call</button>
+            <button class="tab-button" data-tab="corpora-tab">Corpora</button>
+        </div>
+        
+        <!-- Text Tab -->
+        <div id="text-tab" class="tab-content">
+            <h2>Generate Text Response</h2>
+            <form id="textForm">
+                <label for="text">Enter your text</label>
+                <textarea id="text" rows="4" placeholder="Type your message here..."></textarea>
+                
+                <label for="voiceId">Voice (optional)</label>
+                <select id="voiceId"></select>
+                
+                <label for="corpusId">Corpus ID (optional)</label>
+                <input type="text" id="corpusId" placeholder="Enter corpus ID if needed">
+                
+                <button type="submit">Submit</button>
+            </form>
+            <div id="textResult" class="result hidden">
+                <p>Results will appear here</p>
+            </div>
+        </div>
+        
+        <!-- Speech Tab -->
+        <div id="speech-tab" class="tab-content">
+            <h2>Generate Speech</h2>
+            <form id="speechForm">
+                <label for="speech-text">Text to synthesize</label>
+                <textarea id="speech-text" rows="4" placeholder="Enter text to convert to speech..."></textarea>
+                
+                <label for="speech-voiceId">Voice (optional)</label>
+                <select id="speech-voiceId"></select>
+                
+                <button type="submit">Generate Speech</button>
+            </form>
+            <div id="speechResult" class="result hidden">
+                <p>Audio will appear here</p>
+            </div>
+        </div>
+        
+        <!-- Outbound Call Tab -->
+        <div id="outbound-tab" class="tab-content">
+            <h2>Make Outbound Call</h2>
+            <form id="outboundForm">
+                <label for="phoneNumber">Phone Number</label>
+                <input type="tel" id="phoneNumber" placeholder="+1234567890" required>
+                
+                <label for="outbound-voiceId">Voice (optional)</label>
+                <select id="outbound-voiceId"></select>
+                
+                <label for="agentName">Agent Name (optional)</label>
+                <input type="text" id="agentName" placeholder="Enter agent name">
+                
+                <label for="systemPrompt">System Prompt (optional)</label>
+                <textarea id="systemPrompt" rows="4" placeholder="Enter system prompt instructions..."></textarea>
+                
+                <button type="submit">Make Call</button>
+            </form>
+            <div id="outboundResult" class="result hidden">
+                <p>Call results will appear here</p>
+            </div>
+        </div>
+        
+        <!-- WebRTC Call Tab -->
+        <div id="webrtc-tab" class="tab-content">
+            <h2>Web Call with WebRTC</h2>
+            <form id="webrtcForm">
+                <label for="webrtc-voiceId">Voice (optional)</label>
+                <select id="webrtc-voiceId"></select>
+                
+                <label for="webrtc-agentName">Agent Name</label>
+                <input type="text" id="webrtc-agentName" placeholder="Enter agent name (or 'Loddie' for default)">
+                
+                <label for="webrtc-systemPrompt">System Prompt (optional)</label>
+                <textarea id="webrtc-systemPrompt" rows="4" placeholder="Enter system prompt instructions..."></textarea>
+            </form>
+            
+            <div class="call-panel">
+                <div id="call-status" class="call-status">Ready to start call</div>
+                
+                <div class="call-controls">
+                    <div class="call-control">
+                        <button id="start-call" class="call-button start-call">📞</button>
+                    </div>
+                    <div class="call-control">
+                        <button id="mute-call" class="call-button mute-call hidden-control">🔇</button>
+                    </div>
+                    <div class="call-control">
+                        <button id="end-call" class="call-button end-call hidden-control">❌</button>
+                    </div>
+                </div>
+                
+                <div id="call-transcript" class="call-transcript">
+                    <p>Call transcript will appear here when connected.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Corpora Tab -->
+        <div id="corpora-tab" class="tab-content">
+            <h2>Available Corpora</h2>
+            <p class="help-text">These corpora can be used with the text and call endpoints.</p>
+            
+            <div id="corpora-status">Loading corpora...</div>
+            <div id="corpora-container" class="corpus-container"></div>
+        </div>
+    </div>
+    
+    <!-- External JavaScript files -->
+    <script src="js/main.js"></script>
+    <script src="js/webrtc.js"></script>
+</body>
+</html> 
