@@ -3248,8 +3248,8 @@
                             agentName: agentName || 'Loddie',
                             voiceId: document.getElementById('webrtc-voiceId').value || undefined,
                             corpusId: document.getElementById('webrtc-corpusId').value || undefined,
-                            // Add time directly to system prompt
-                            systemPrompt: `CRITICAL INSTRUCTION: The current time is EXACTLY ${exactTimeString}. You MUST begin your conversation by saying "Good ${hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening')}! It's ${exactTimeString} right now."\n\n${document.getElementById('webrtc-systemPrompt').value || ''}`,
+                            // Send system prompt as entered by the user without modifications
+                            systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined,
                             userEmail: document.getElementById('webrtc-userEmail').value || undefined,
                             // Simplified time information
                             userLocalTimeString: localTimeString,
@@ -3484,6 +3484,37 @@
                 console.log('Generated WebRTC shareable link:', shareableLink);
                 console.log('Voice ID:', voiceId);
                 console.log('Corpus ID:', corpusId);
+                
+                // Create or update the widget integration link
+                let widgetLinkContainer = document.getElementById('webrtc-widgetLinkContainer');
+                if (!widgetLinkContainer) {
+                    widgetLinkContainer = document.createElement('div');
+                    widgetLinkContainer.id = 'webrtc-widgetLinkContainer';
+                    widgetLinkContainer.className = 'widget-link-container';
+                    widgetLinkContainer.style.marginTop = '10px';
+                    widgetLinkContainer.style.padding = '10px';
+                    widgetLinkContainer.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
+                    widgetLinkContainer.style.borderRadius = '4px';
+                    widgetLinkContainer.style.display = 'flex';
+                    widgetLinkContainer.style.alignItems = 'center';
+                    widgetLinkContainer.style.justifyContent = 'space-between';
+                    
+                    const widgetLinkText = document.createElement('span');
+                    widgetLinkText.innerHTML = '<strong>Add this voice agent to your website!</strong> Create an embeddable widget with your settings.';
+                    
+                    const widgetLinkButton = document.createElement('a');
+                    widgetLinkButton.href = '/widget/';
+                    widgetLinkButton.className = 'button';
+                    widgetLinkButton.textContent = 'Create Widget';
+                    widgetLinkButton.style.marginLeft = '10px';
+                    widgetLinkButton.style.whiteSpace = 'nowrap';
+                    
+                    widgetLinkContainer.appendChild(widgetLinkText);
+                    widgetLinkContainer.appendChild(widgetLinkButton);
+                    
+                    // Insert it after the shareable link container
+                    shareableLinkContainer.parentNode.insertBefore(widgetLinkContainer, shareableLinkContainer.nextSibling);
+                }
             }
 
             // End call button click handler

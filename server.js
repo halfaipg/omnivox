@@ -43,10 +43,9 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Add CORS middleware with proper headers for all routes
+// Add CORS middleware to support remote embedding
 app.use((req, res, next) => {
-  // Allow any origin for all routes
-  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Origin', '*'); // Allow any origin
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
   
@@ -58,25 +57,59 @@ app.use((req, res, next) => {
   next();
 });
 
-// Specific CORS and content-type headers for SDK and widget files
-app.use(['/ultravox-sdk', '/widget'], (req, res, next) => {
-  // Ensure these paths can be accessed from any domain with proper headers
+// Add special CORS headers for SDK files
+app.use('/ultravox-sdk', (req, res, next) => {
+  // Ensure SDK files can be loaded from any domain
   res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.header('Cross-Origin-Embedder-Policy', 'credentialless');
   
-  // Set appropriate MIME types based on file extension
+  // Set the correct MIME type for JavaScript modules
   if (req.path.endsWith('.js') || req.path.endsWith('.mjs')) {
     res.header('Content-Type', 'application/javascript');
   } else if (req.path.endsWith('.json')) {
     res.header('Content-Type', 'application/json');
-  } else if (req.path.endsWith('.mp3')) {
-    res.header('Content-Type', 'audio/mpeg');
-  } else if (req.path.endsWith('.wav')) {
-    res.header('Content-Type', 'audio/wav');
   }
   
   next();
+});
+
+// Add special route to handle cross-origin SDK imports via proxy
+app.get('/sdk-proxy/esm/:filename', async (req, res) => {
+  try {
+    // This route lets you proxy requests to the SDK
+    const filePath = `/ultravox-sdk/esm/${req.params.filename}`;
+    
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Content-Type', 'application/javascript');
+    
+    // Serve the file by routing through the middleware
+    req.url = filePath;
+    res.sendFile(path.join(__dirname, 'public', filePath));
+  } catch (error) {
+    console.error('Error serving SDK proxy file:', error);
+    res.status(500).send('Error serving SDK file');
+  }
+});
+
+// Add special route to handle cross-origin UMD imports via proxy
+app.get('/sdk-proxy/umd/:filename', async (req, res) => {
+  try {
+    // This route lets you proxy requests to the SDK
+    const filePath = `/ultravox-sdk/umd/${req.params.filename}`;
+    
+    // Set CORS headers
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Content-Type', 'application/javascript');
+    
+    // Serve the file
+    res.sendFile(path.join(__dirname, 'public', filePath));
+  } catch (error) {
+    console.error('Error serving SDK proxy file:', error);
+    res.status(500).send('Error serving SDK file');
+  }
 });
 
 // Set up middleware for parsing requests
@@ -144,22 +177,16 @@ app.use(fileUpload({
     tempFileDir: '/tmp/'
 }));
 
-// Serve static files from the public directory with proper CORS headers
+// Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public'), {
     setHeaders: (res, path, stat) => {
-        // Set CORS headers for all static files
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-        
-        // Set proper MIME types for different file types
-        if (path.endsWith('.js') || path.endsWith('.mjs')) {
+        // Set proper MIME types for JavaScript files
+        if (path.endsWith('.js')) {
+            res.set('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.mjs')) {
             res.set('Content-Type', 'application/javascript');
         } else if (path.endsWith('.json')) {
             res.set('Content-Type', 'application/json');
-        } else if (path.endsWith('.mp3')) {
-            res.set('Content-Type', 'audio/mpeg');
-        } else if (path.endsWith('.wav')) {
-            res.set('Content-Type', 'audio/wav');
         }
     }
 }));
@@ -390,39 +417,82 @@ async function createUltravoxCall(options = {}) {
         userEmail,
         userLocalTimeString,
         userTimeZone,
+        // Accept additional time parameters from widget
+        timeOfDay: providedTimeOfDay,
+        dayOfWeek: providedDayOfWeek,
+        dateString: providedDateString,
+        exactTimeString: providedExactTimeString,
+        hour: providedHour,
         medium
     } = options;
 
-    // Get current time for the system prompt
+    console.log('createUltravoxCall received systemPrompt:', systemPrompt ? {
+        length: systemPrompt.length,
+        preview: systemPrompt.substring(0, 50) + '...'
+    } : 'not provided');
+    
+    console.log('createUltravoxCall received agentName:', agentName || 'not provided');
+
+    // Log more details about the systemPrompt for debugging
+    if (systemPrompt) {
+        console.log('DETAILED PROMPT DEBUG:');
+        console.log('PROMPT TYPE:', typeof systemPrompt);
+        console.log('PROMPT LENGTH:', systemPrompt.length);
+        console.log('PROMPT FIRST 100 CHARS:', systemPrompt.substring(0, 100));
+        console.log('PROMPT LAST 100 CHARS:', systemPrompt.substring(systemPrompt.length - 100));
+        console.log('PROMPT CONTAINS SPECIAL CHARS:', /[^\x20-\x7E]/.test(systemPrompt));
+    } else {
+        console.log('DETAILED PROMPT DEBUG: No system prompt provided to createUltravoxCall');
+    }
+
+    // Get current time for the system prompt - use provided values or calculate
     const now = new Date();
-    const hour = now.getHours();
-    const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+    const hour = providedHour !== undefined ? providedHour : now.getHours();
+    const timeOfDay = providedTimeOfDay || (hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening'));
     const timezone = userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
     
-    // Format time with day of week and date in a clean format
-    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
-    const dateString = now.toLocaleDateString('en-US', { 
+    // Use provided values or calculate from current time
+    const dayOfWeek = providedDayOfWeek || now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
+    const dateString = providedDateString || now.toLocaleDateString('en-US', { 
         month: 'long', 
         day: 'numeric',
         year: 'numeric',
         timeZone: timezone 
     });
     
-    // Format time manually to ensure no seconds
-    const hour12 = hour % 12 || 12;
-    const minutes = now.getMinutes();
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    
-    // Create time string in format like "three pm" or "three thirty pm"
+    // Format time manually to ensure no seconds if not provided
     let timeString;
-    if (minutes === 0) {
-        timeString = `${hour12} ${ampm.toLowerCase()}`;
+    if (providedExactTimeString) {
+        timeString = providedExactTimeString;
     } else {
-        timeString = `${hour12} ${minutes < 10 ? 'oh' : ''} ${minutes} ${ampm.toLowerCase()}`;
+        const hour12 = hour % 12 || 12;
+        const minutes = now.getMinutes();
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        
+        if (minutes === 0) {
+            timeString = `${hour12} ${ampm.toLowerCase()}`;
+        } else {
+            timeString = `${hour12} ${minutes < 10 ? 'oh' : ''} ${minutes} ${ampm.toLowerCase()}`;
+        }
     }
     
     // Combine into a clean format
-    const exactTimeString = userLocalTimeString || timeString;
+    const exactTimeString = providedExactTimeString || userLocalTimeString || timeString;
+    
+    // Log all the time values being used
+    console.log('Time values being used for prompt:', {
+        providedHour,
+        calculatedHour: hour,
+        providedTimeOfDay,
+        calculatedTimeOfDay: timeOfDay,
+        providedDayOfWeek,
+        calculatedDayOfWeek: dayOfWeek,
+        providedDateString,
+        calculatedDateString: dateString,
+        providedExactTimeString,
+        finalTimeString: timeString,
+        timezone
+    });
     
     // Add time instruction at the very beginning - with date and timezone
     const timeInstruction = `The current time is ${timeString} on ${dayOfWeek}, ${dateString} in the ${timezone} timezone. Begin your conversation by saying "Hello, it's ${timeString}, ${dayOfWeek} ${timeOfDay}." Then continue with a friendly introduction and ask how you can help them today. IMPORTANT: When saying times, always use formats like "three pm" or "three thirty pm".\n\n`;
@@ -432,21 +502,31 @@ async function createUltravoxCall(options = {}) {
         process.env.OUTBOUND_SYSTEM_PROMPT : 
         process.env.INBOUND_SYSTEM_PROMPT;
     
-    // Get the final system prompt with all enhancements
-    const finalSystemPrompt = systemPrompt ? 
-        processSystemPrompt(systemPrompt, agentName) : 
-        getSystemPrompt(isOutbound, agentName || AI_NAME, userEmail, userLocalTimeString, userTimeZone);
+    // First, check if we have a user-provided prompt
+    let processedPrompt;
+    if (systemPrompt) {
+        // IMPORTANT FIX: Always process the prompt with the agent name, even if user-provided
+        processedPrompt = processSystemPrompt(systemPrompt, agentName);
+        console.log('Applied agent name to user-provided prompt:', {
+            agentName: agentName || AI_NAME,
+            originalLength: systemPrompt.length,
+            processedLength: processedPrompt.length
+        });
+    } else {
+        // Get the final system prompt with all enhancements for auto-generated prompts
+        processedPrompt = getSystemPrompt(isOutbound, agentName || AI_NAME, userEmail, userLocalTimeString, userTimeZone);
+    }
 
-    // Combine prompts in the correct order: time instruction -> base prompt, but don't add time instruction if system prompt is provided
+    // For auto-generated prompts, add the time instruction
     const combinedPrompt = systemPrompt ? 
-        systemPrompt : // Just use the provided system prompt as is
+        processedPrompt : // Use the processed user prompt without time instruction
         (basePrompt ? 
             `${timeInstruction}Your name is ${agentName || AI_NAME} and you are ${basePrompt.replace(/{AGENT_NAME}/g, agentName || AI_NAME)}` : 
-            `${timeInstruction}${finalSystemPrompt}`);
+            `${timeInstruction}${processedPrompt}`);
 
     // Add stronger emphasis on proactive tool usage, but only for auto-generated prompts (not user-provided ones)
     const enhancedPrompt = systemPrompt ? 
-        systemPrompt : // Keep user-provided system prompt as is
+        processedPrompt : // Keep processed user prompt as is
         `${combinedPrompt}\n\nCRITICAL INSTRUCTION: You MUST use your tools PROACTIVELY without waiting to be asked. Specifically:
 1. When ANY conversation about scheduling, availability, or meetings occurs, IMMEDIATELY use the calendar tool to check availability WITHOUT SAYING "let me check the calendar" first
 2. ALWAYS check and quote available time slots BEFORE scheduling any meeting - never schedule without first checking availability
@@ -459,6 +539,12 @@ async function createUltravoxCall(options = {}) {
 9. For the hangUp tool, use it when the conversation has reached a natural conclusion
 10. ALWAYS confirm meeting details after scheduling by saying something like "Great! I've scheduled your meeting with Half for [day] at [time]. You'll receive a calendar invitation shortly."
 11. When confirming meetings, be specific about the exact day and time that was scheduled`;
+    
+    console.log('Final prompt after processing:', enhancedPrompt ? {
+        length: enhancedPrompt.length,
+        preview: enhancedPrompt.substring(0, 50) + '...',
+        isSystemPromptProvided: !!systemPrompt
+    } : 'empty prompt');
     
     // Create base call config
     const callConfig = {
@@ -1687,6 +1773,8 @@ app.get('/test-telnyx', async (req, res) => {
 // Add endpoint to get join URL for WebRTC call
 app.post('/webrtc-join-url', async (req, res) => {
     try {
+        console.log('Raw request body:', req.body);
+        
         const { 
             voiceId, 
             corpusId, 
@@ -1694,20 +1782,44 @@ app.post('/webrtc-join-url', async (req, res) => {
             systemPrompt,
             userEmail,
             userLocalTimeString,
-            userTimeZone
+            userTimeZone,
+            // Extract additional time context fields
+            timeOfDay,
+            dayOfWeek,
+            dateString,
+            exactTimeString,
+            hour
         } = req.body;
         
         console.log('Received WebRTC join URL request:', {
             voiceId,
             corpusId,
-            agentName,
-            systemPrompt: systemPrompt ? 'provided' : 'not provided',
+            agentName: agentName || '(not provided)',
+            systemPromptDetails: systemPrompt ? {
+                length: systemPrompt.length,
+                firstChars: systemPrompt.substring(0, 50) + '...'
+            } : '(not provided)',
             userEmail: userEmail ? 'provided' : 'not provided',
             userLocalTimeString: userLocalTimeString || 'not provided',
-            userTimeZone: userTimeZone || 'not provided'
+            userTimeZone: userTimeZone || 'not provided',
+            timeOfDay: timeOfDay || 'morning',
+            dayOfWeek: dayOfWeek || 'Monday',
+            dateString: dateString || 'March 1, 2025',
+            exactTimeString: exactTimeString || '11:45 AM',
+            hour: hour || 11
         });
+
+        // Add more detailed prompt debugging
+        if (systemPrompt) {
+            console.log('PROMPT DEBUG - received prompt details:');
+            console.log('PROMPT DEBUG - length:', systemPrompt.length);
+            console.log('PROMPT DEBUG - first 200 chars:', systemPrompt.substring(0, 200));
+            console.log('PROMPT DEBUG - full prompt:', systemPrompt);
+        } else {
+            console.log('PROMPT DEBUG - NO SYSTEM PROMPT PROVIDED IN REQUEST');
+        }
         
-        // Create Ultravox call with WebRTC medium
+        // Create Ultravox call with WebRTC medium and all time parameters
         const response = await createUltravoxCall({
             systemPrompt,
             voiceId,
@@ -1716,6 +1828,12 @@ app.post('/webrtc-join-url', async (req, res) => {
             userEmail,
             userLocalTimeString,
             userTimeZone,
+            // Pass all additional time context from the widget
+            timeOfDay,
+            dayOfWeek,
+            dateString,
+            exactTimeString,
+            hour,
             // Specific options for WebRTC
             medium: { "webRtc": {} }
         });
@@ -2607,4 +2725,190 @@ app.get('/oauth2callback-microsoft', async (req, res) => {
     console.error('Error during Microsoft OAuth callback:', error);
     res.status(500).send(`Authentication error: ${error.message}`);
   }
+});
+
+// Add multer storage configuration for avatar uploads
+const avatarStorage = multer.memoryStorage();
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
+
+// Process and resize avatar images to 100x100
+function processAvatar(buffer) {
+  return new Promise((resolve, reject) => {
+    try {
+      // Create a new canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = 100;
+      canvas.height = 100;
+      
+      // Load image from buffer
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvas.getContext('2d');
+        
+        // Draw image to canvas with proper resizing
+        ctx.drawImage(img, 0, 0, 100, 100);
+        
+        // Get base64 data URL
+        const base64 = canvas.toDataURL('image/jpeg', 0.9);
+        resolve(base64);
+      };
+      
+      img.onerror = (err) => {
+        reject(new Error('Failed to process image'));
+      };
+      
+      img.src = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// API endpoint for handling avatar uploads
+app.post('/upload-avatar', avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No avatar image provided' });
+    }
+    
+    // Process the image using Sharp
+    const sharp = await import('sharp');
+    const processedImageBuffer = await sharp.default(req.file.buffer)
+      .resize(100, 100, { fit: 'cover' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    
+    // Convert to base64
+    const base64Image = `data:image/jpeg;base64,${processedImageBuffer.toString('base64')}`;
+    
+    // Return the processed image as base64
+    res.json({
+      success: true,
+      avatarUrl: base64Image
+    });
+  } catch (error) {
+    console.error('Error processing avatar:', error);
+    res.status(500).json({ error: 'Failed to process avatar image', details: error.message });
+  }
+});
+
+// API endpoint for cropping avatars
+app.post('/crop-avatar', express.json({limit: '10mb'}), async (req, res) => {
+  try {
+    const { imageData, cropData } = req.body;
+    
+    if (!imageData || !cropData) {
+      return res.status(400).json({ error: 'Missing image data or crop coordinates' });
+    }
+    
+    // Check that we have all the required crop parameters
+    if (typeof cropData.x !== 'number' || typeof cropData.y !== 'number' || 
+        typeof cropData.width !== 'number' || typeof cropData.height !== 'number') {
+      return res.status(400).json({ error: 'Invalid crop coordinates' });
+    }
+    
+    // Extract base64 data
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    // Process the image using Sharp
+    const sharp = await import('sharp');
+    const processedImageBuffer = await sharp.default(imageBuffer)
+      .extract({ 
+        left: Math.round(cropData.x), 
+        top: Math.round(cropData.y), 
+        width: Math.round(cropData.width), 
+        height: Math.round(cropData.height) 
+      })
+      .resize(100, 100)
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    
+    // Convert to base64
+    const base64Image = `data:image/jpeg;base64,${processedImageBuffer.toString('base64')}`;
+    
+    // Return the processed image
+    res.json({
+      success: true,
+      avatarUrl: base64Image
+    });
+  } catch (error) {
+    console.error('Error cropping avatar:', error);
+    res.status(500).json({ error: 'Failed to crop avatar image', details: error.message });
+  }
+});
+
+app.post('/process-avatar', async (req, res) => {
+    try {
+        // Check if we have the file or a data URL in the request
+        let imageData = null;
+        
+        if (req.files && req.files.avatar) {
+            // Handle file upload
+            const avatarFile = req.files.avatar;
+            
+            // Read the file data
+            imageData = avatarFile.data;
+        } else if (req.body.avatarData) {
+            // Handle data URL
+            const dataUrl = req.body.avatarData;
+            const matches = dataUrl.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+            
+            if (!matches || matches.length !== 3) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid data URL format'
+                });
+            }
+            
+            // Extract base64 data
+            imageData = Buffer.from(matches[2], 'base64');
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'No avatar image provided'
+            });
+        }
+        
+        // Process the image with Sharp to ensure it's 100x100 pixels
+        const sharp = await import('sharp');
+        
+        const processedImage = await sharp.default(imageData)
+            .resize({
+                width: 100,
+                height: 100,
+                fit: 'cover',
+                position: 'center'
+            })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+        
+        // Convert to base64
+        const base64Image = `data:image/jpeg;base64,${processedImage.toString('base64')}`;
+        
+        // Return the base64 encoded image
+        res.json({
+            success: true,
+            avatarUrl: base64Image
+        });
+    } catch (error) {
+        console.error('Error processing avatar:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process avatar image'
+        });
+    }
 });
