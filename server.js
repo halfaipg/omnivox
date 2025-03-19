@@ -417,12 +417,6 @@ async function createUltravoxCall(options = {}) {
         userEmail,
         userLocalTimeString,
         userTimeZone,
-        // Accept additional time parameters from widget
-        timeOfDay: providedTimeOfDay,
-        dayOfWeek: providedDayOfWeek,
-        dateString: providedDateString,
-        exactTimeString: providedExactTimeString,
-        hour: providedHour,
         medium
     } = options;
 
@@ -445,54 +439,36 @@ async function createUltravoxCall(options = {}) {
         console.log('DETAILED PROMPT DEBUG: No system prompt provided to createUltravoxCall');
     }
 
-    // Get current time for the system prompt - use provided values or calculate
+    // Get current time for the system prompt
     const now = new Date();
-    const hour = providedHour !== undefined ? providedHour : now.getHours();
-    const timeOfDay = providedTimeOfDay || (hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening'));
+    const hour = now.getHours();
+    const timeOfDay = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
     const timezone = userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
     
-    // Use provided values or calculate from current time
-    const dayOfWeek = providedDayOfWeek || now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
-    const dateString = providedDateString || now.toLocaleDateString('en-US', { 
+    // Format time with day of week and date in a clean format
+    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone });
+    const dateString = now.toLocaleDateString('en-US', { 
         month: 'long', 
         day: 'numeric',
         year: 'numeric',
         timeZone: timezone 
     });
     
-    // Format time manually to ensure no seconds if not provided
+    // Format time manually to ensure no seconds
+    const hour12 = hour % 12 || 12;
+    const minutes = now.getMinutes();
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    
+    // Create time string in format like "three pm" or "three thirty pm"
     let timeString;
-    if (providedExactTimeString) {
-        timeString = providedExactTimeString;
+    if (minutes === 0) {
+        timeString = `${hour12} ${ampm.toLowerCase()}`;
     } else {
-        const hour12 = hour % 12 || 12;
-        const minutes = now.getMinutes();
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        
-        if (minutes === 0) {
-            timeString = `${hour12} ${ampm.toLowerCase()}`;
-        } else {
-            timeString = `${hour12} ${minutes < 10 ? 'oh' : ''} ${minutes} ${ampm.toLowerCase()}`;
-        }
+        timeString = `${hour12} ${minutes < 10 ? 'oh' : ''} ${minutes} ${ampm.toLowerCase()}`;
     }
     
     // Combine into a clean format
-    const exactTimeString = providedExactTimeString || userLocalTimeString || timeString;
-    
-    // Log all the time values being used
-    console.log('Time values being used for prompt:', {
-        providedHour,
-        calculatedHour: hour,
-        providedTimeOfDay,
-        calculatedTimeOfDay: timeOfDay,
-        providedDayOfWeek,
-        calculatedDayOfWeek: dayOfWeek,
-        providedDateString,
-        calculatedDateString: dateString,
-        providedExactTimeString,
-        finalTimeString: timeString,
-        timezone
-    });
+    const exactTimeString = userLocalTimeString || timeString;
     
     // Add time instruction at the very beginning - with date and timezone
     const timeInstruction = `The current time is ${timeString} on ${dayOfWeek}, ${dateString} in the ${timezone} timezone. Begin your conversation by saying "Hello, it's ${timeString}, ${dayOfWeek} ${timeOfDay}." Then continue with a friendly introduction and ask how you can help them today. IMPORTANT: When saying times, always use formats like "three pm" or "three thirty pm".\n\n`;
