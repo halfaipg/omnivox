@@ -1970,6 +1970,315 @@ Leave empty to use the above prompt."></textarea>
                 }
                 
                 // Set up WebRTC call controls
+                // Function declaration moved to before usage
+                function setupWebRTCCallControls() {
+                    const startCallButton = document.getElementById('start-call');
+                    const muteCallButton = document.getElementById('mute-call');
+                    const endCallButton = document.getElementById('end-call');
+                    const callStatus = document.getElementById('call-status');
+                    const callTranscript = document.getElementById('call-transcript');
+                    
+                    if (!startCallButton || !muteCallButton || !endCallButton || !callStatus || !callTranscript) {
+                        console.error('WebRTC call controls not found');
+                        return;
+                    }
+                    
+                    // Start call button click handler
+                    startCallButton.addEventListener('click', async () => {
+                        try {
+                            // Disable the start call button immediately
+                            startCallButton.disabled = true;
+                            
+                            // Add connecting class for pulsing animation
+                            startCallButton.classList.add('connecting');
+                            
+                            // Get agent name from form
+                            const agentName = document.getElementById('webrtc-agentName').value;
+                            
+                            // Update status with agent name
+                            const agentDisplayName = agentName || 'Loddie';
+                            callStatus.textContent = `Calling ${agentDisplayName}...`;
+                            
+                            // Start ringtone immediately
+                            ringtone.currentTime = 0;
+                            ringtone.play();
+                            
+                            // Wait 2-5 seconds before starting the connection
+                            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 3000) + 2000));
+                            
+                            // Get user's local time information
+                            const now = new Date();
+                            const localTimeString = now.toLocaleString();
+                            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                            
+                            // Get join URL from server
+                            const response = await fetch('/webrtc-join-url', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    agentName: agentName || 'Loddie',
+                                    voiceId: document.getElementById('webrtc-voiceId').value || undefined,
+                                    corpusId: document.getElementById('webrtc-corpusId').value || undefined,
+                                    systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined,
+                                    userLocalTimeString: localTimeString,
+                                    userTimeZone: timeZone
+                                })
+                            });
+                            
+                            if (!response.ok) {
+                                throw new Error('Failed to get join URL');
+                            }
+                            
+                            const data = await response.json();
+                            
+                            if (!data.joinUrl) {
+                                throw new Error('No join URL provided');
+                            }
+                            
+                            // Create new call session
+                            if (!UltravoxSession) {
+                                await loadUltravoxSDK();
+                                if (!UltravoxSession) {
+                                    ringtone.pause(); // Stop ringtone if SDK fails to load
+                                    throw new Error('Could not load Ultravox SDK');
+                                }
+                            }
+                            
+                            // Create and initialize the session
+                            callSession = new UltravoxSession();
+                            
+                            // Set up event listeners for call status changes
+                            callSession.addEventListener('status', (event) => {
+                                if (callSession) {  // Only update status if session still exists
+                                    const status = callSession.status;
+                                    callStatus.textContent = `Call status: ${status}`;
+                                    
+                                    // Play connect sound when call is connected
+                                    if (status === 'connected' && ringtone.paused) {
+                                        // Stop ringtone if it's still playing
+                                        ringtone.pause();
+                                        
+                                        // Play connect sound
+                                        connectSound.currentTime = 0;
+                                        connectSound.play().catch(err => console.error('Error playing connect sound:', err));
+                                    }
+                                    
+                                    // Handle disconnected state
+                                    if (status === 'disconnected') {
+                                        handleCallEnd();
+                                    }
+                                }
+                            });
+                            
+                            // Set up transcript updates
+                            callSession.addEventListener('transcripts', (event) => {
+                                updateTranscript(callSession.transcripts);
+                            });
+                            
+                            // Add a listener for when the room is created
+                            const originalSetStatus = callSession.setStatus;
+                            if (originalSetStatus) {
+                                callSession.setStatus = function(status) {
+                                    // Call the original method
+                                    originalSetStatus.call(this, status);
+                                    
+                                    // If we're connecting, set up room event listeners when the room is available
+                                    if (status === 'connecting' || status === 'connected') {
+                                        // Wait for room to be created
+                                        const checkRoom = setInterval(() => {
+                                            if (this.room) {
+                                                clearInterval(checkRoom);
+                                                
+                                                // Listen for room disconnect events
+                                                this.room.on('disconnected', () => {
+                                                    console.log('Room disconnected by server or AI');
+                                                    handleCallEnd();
+                                                });
+                                                
+                                                // Listen for participant left events (AI agent leaving)
+                                                this.room.on('participantDisconnected', (participant) => {
+                                                    console.log('Participant disconnected:', participant);
+                                                    handleCallEnd();
+                                                });
+                                            }
+                                        }, 100);
+                                    }
+                                };
+                            }
+                            
+                            // Join the call
+                            callSession.joinCall(data.joinUrl);
+                            
+                            // Update UI for active call
+                            callActive = true;
+                            startCallButton.classList.remove('connecting'); // Remove connecting class
+                            startCallButton.classList.add('hidden-control');
+                            muteCallButton.classList.remove('hidden-control');
+                            muteCallButton.classList.add('show-control');
+                            endCallButton.classList.remove('hidden-control');
+                            endCallButton.classList.add('show-control');
+                            
+                            // Stop ringtone and play connect sound
+                            ringtone.pause();
+                            connectSound.currentTime = 0;
+                            connectSound.play().catch(err => console.error('Error playing connect sound:', err));
+                            
+                            // Clear transcript with agent name
+                            const displayName = agentName || 'Loddie';
+                            callTranscript.innerHTML = `<p class="connected-message">Connected - ${displayName} has joined the call.</p>`;
+                            
+                        } catch (error) {
+                            console.error('Error starting call:', error);
+                            // Stop ringtone when there's an error
+                            if (ringtone) {
+                                ringtone.pause();
+                            }
+                            callStatus.textContent = `Error: ${error.message}`;
+                            callTranscript.innerHTML = `<p>Failed to start call: ${error.message}</p>`;
+                            // Re-enable the start call button on error and remove connecting class
+                            startCallButton.disabled = false;
+                            startCallButton.classList.remove('connecting');
+                        }
+                    });
+                    
+                    // Mute button click handler
+                    muteCallButton.addEventListener('click', () => {
+                        if (!callSession) return;
+                        
+                        if (callSession.isMicMuted) {
+                            callSession.unmuteMic();
+                            muteCallButton.classList.remove('active');
+                        } else {
+                            callSession.muteMic();
+                            muteCallButton.classList.add('active');
+                        }
+                    });
+                    
+                    // Function to play hangup sound
+                    function playHangupSound() {
+                        console.log('Attempting to play hangup sound...');
+                        console.log('hangupSound exists:', !!hangupSound);
+                        console.log('hangupSound.playing:', hangupSound?.playing);
+                        
+                        if (hangupSound && !hangupSound.playing) {
+                            console.log('Playing hangup sound...');
+                            hangupSound.currentTime = 0;
+                            
+                            // Add a flag to track if the sound is playing
+                            hangupSound.playing = true;
+                            
+                            // Play the sound and reset the flag when done
+                            hangupSound.play().then(() => {
+                                console.log('Hangup sound started playing successfully');
+                            }).catch(err => {
+                                console.error('Error playing hangup sound:', err);
+                                hangupSound.playing = false;
+                            });
+                            
+                            // Reset the playing flag when the sound ends
+                            hangupSound.onended = () => {
+                                console.log('Hangup sound finished playing');
+                                hangupSound.playing = false;
+                            };
+                        } else {
+                            console.log('Hangup sound not played - conditions not met');
+                        }
+                    }
+                    
+                    // Function to handle call end cleanup
+                    function handleCallEnd() {
+                        // Prevent multiple calls to handleCallEnd
+                        if (!callActive) return;
+                        
+                        // Set callActive to false immediately to prevent multiple executions
+                        callActive = false;
+                        
+                        // Play hangup sound
+                        playHangupSound();
+                        
+                        // Update UI
+                        startCallButton.classList.remove('hidden-control');
+                        startCallButton.disabled = false;
+                        muteCallButton.classList.add('hidden-control');
+                        muteCallButton.classList.remove('show-control', 'active');
+                        endCallButton.classList.add('hidden-control');
+                        endCallButton.classList.remove('show-control');
+                        
+                        callStatus.textContent = 'Call ended';
+                        callSession = null;
+                        
+                        // Generate and show shareable link
+                        generateWebRTCShareableLink();
+                    }
+                    
+                    // Function to generate WebRTC shareable link
+                    function generateWebRTCShareableLink() {
+                        const shareableLinkContainer = document.getElementById('webrtc-shareableLinkContainer');
+                        const shareableLinkInput = document.getElementById('webrtc-shareableLink');
+                        
+                        if (!shareableLinkContainer || !shareableLinkInput) return;
+                        
+                        const baseUrl = window.location.origin + window.location.pathname;
+                        let shareableLink = baseUrl + '?';
+                        
+                        // Get values from form fields
+                        const voiceIdSelect = document.getElementById('webrtc-voiceId');
+                        const voiceId = voiceIdSelect ? voiceIdSelect.value : '';
+                        const agentName = document.getElementById('webrtc-agentName').value;
+                        const corpusIdSelect = document.getElementById('webrtc-corpusId');
+                        const corpusId = corpusIdSelect ? corpusIdSelect.value : '';
+                        const systemPrompt = document.getElementById('webrtc-systemPrompt').value;
+                        
+                        // Only add parameters that have values
+                        if (voiceId) shareableLink += 'voice=' + encodeURIComponent(voiceId) + '&';
+                        if (agentName) shareableLink += 'agent=' + encodeURIComponent(agentName) + '&';
+                        if (corpusId) shareableLink += 'corpus=' + encodeURIComponent(corpusId) + '&';
+                        if (systemPrompt) shareableLink += 'prompt=' + encodeURIComponent(systemPrompt);
+                        
+                        // Add tab parameter to open the WebRTC tab
+                        shareableLink += (shareableLink.endsWith('&') ? '' : '&') + 'tab=webrtc';
+                        
+                        // Remove trailing '&' if needed
+                        if (shareableLink.endsWith('&')) {
+                            shareableLink = shareableLink.slice(0, -1);
+                        }
+                        
+                        // Update the input field
+                        shareableLinkInput.value = shareableLink;
+                        
+                        // Show the container
+                        shareableLinkContainer.classList.remove('hidden');
+                    }
+
+                    // End call button click handler
+                    endCallButton.addEventListener('click', async () => {
+                        if (!callSession) return;
+                        
+                        try {
+                            callStatus.textContent = 'Ending call...';
+                            await callSession.leaveCall();
+                            
+                            // Always play hangup sound when end call button is clicked
+                            playHangupSound();
+                            
+                            // If status event doesn't trigger, handle cleanup here
+                            setTimeout(() => {
+                                if (callActive) {
+                                    handleCallEnd();
+                                }
+                            }, 1000);
+                            
+                        } catch (error) {
+                            console.error('Error ending call:', error);
+                            callStatus.textContent = `Error ending call: ${error.message}`;
+                            // Always play hangup sound even on error
+                            playHangupSound();
+                            handleCallEnd();
+                        }
+                    });
+                }
                 setupWebRTCCallControls();
                 
                 // Set up WebRTC shareable link
@@ -3136,6 +3445,11 @@ Leave empty to use the above prompt."></textarea>
                     // Wait 2-5 seconds before starting the connection
                     await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 3000) + 2000));
                     
+                    // Get user's local time information
+                    const now = new Date();
+                    const localTimeString = now.toLocaleString();
+                    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    
                     // Get join URL from server
                     const response = await fetch('/webrtc-join-url', {
                         method: 'POST',
@@ -3146,7 +3460,9 @@ Leave empty to use the above prompt."></textarea>
                             agentName: agentName || 'Loddie',
                             voiceId: document.getElementById('webrtc-voiceId').value || undefined,
                             corpusId: document.getElementById('webrtc-corpusId').value || undefined,
-                            systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined
+                            systemPrompt: document.getElementById('webrtc-systemPrompt').value || undefined,
+                            userLocalTimeString: localTimeString,
+                            userTimeZone: timeZone
                         })
                     });
                     
@@ -3279,15 +3595,8 @@ Leave empty to use the above prompt."></textarea>
                 }
             });
             
-            // Function to handle call end cleanup
-            function handleCallEnd() {
-                // Prevent multiple calls to handleCallEnd
-                if (!callActive) return;
-                
-                // Set callActive to false immediately to prevent multiple executions
-                callActive = false;
-                
-                // Play hangup sound with a check to prevent double-playing
+            // Function to play hangup sound
+            function playHangupSound() {
                 if (hangupSound && !hangupSound.playing) {
                     hangupSound.currentTime = 0;
                     
@@ -3302,6 +3611,18 @@ Leave empty to use the above prompt."></textarea>
                         hangupSound.playing = false;
                     };
                 }
+            }
+            
+            // Function to handle call end cleanup
+            function handleCallEnd() {
+                // Prevent multiple calls to handleCallEnd
+                if (!callActive) return;
+                
+                // Set callActive to false immediately to prevent multiple executions
+                callActive = false;
+                
+                // Play hangup sound
+                playHangupSound();
                 
                 // Update UI
                 startCallButton.classList.remove('hidden-control');
@@ -3365,6 +3686,9 @@ Leave empty to use the above prompt."></textarea>
                     callStatus.textContent = 'Ending call...';
                     await callSession.leaveCall();
                     
+                    // Always play hangup sound when end call button is clicked
+                    playHangupSound();
+                    
                     // If status event doesn't trigger, handle cleanup here
                     setTimeout(() => {
                         if (callActive) {
@@ -3375,6 +3699,8 @@ Leave empty to use the above prompt."></textarea>
                 } catch (error) {
                     console.error('Error ending call:', error);
                     callStatus.textContent = `Error ending call: ${error.message}`;
+                    // Always play hangup sound even on error
+                    playHangupSound();
                     handleCallEnd();
                 }
             });

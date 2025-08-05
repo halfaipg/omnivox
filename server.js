@@ -121,12 +121,20 @@ const INBOUND_FIRST_SPEAKER = process.env.INBOUND_FIRST_SPEAKER || 'FIRST_SPEAKE
 // Use a static preprompt instead of reading from env
 const AGENT_PREPROMPT = "Your name is {AGENT_NAME} and you are using audible speech. NEVER vocalize anything that wouldn't be said out loud in a real conversation. DO NOT say text in brackets like [nervous laugh], [pauses], [thinking], etc. Instead, use natural speech patterns such as 'hmm', 'let me think', 'ah', 'I see', etc. when appropriate. NEVER read aloud descriptive text, stage directions, or non-verbal cues. Please strictly adhere to the following prompt:";
 // Process system prompt by replacing variables
-function processSystemPrompt(prompt, agentName) {
+function processSystemPrompt(prompt, agentName, userLocalTimeString = null, userTimeZone = null) {
     // Use the provided agent name or fall back to the default AI_NAME
     const nameToUse = agentName || AI_NAME;
     
     // Add preprompt if needed
     let processedPrompt = prompt;
+    
+    // Add time information if available and enabled
+    if (userLocalTimeString && userTimeZone && process.env.ULTRAVOX_USE_TIME_GREETING !== 'false') {
+        // Add casual time instruction at the very beginning
+        const timeInstruction = `The user's local time is ${userLocalTimeString} in ${userTimeZone}. Use this to give a natural, casual greeting based on the time of day (like "Hey there, good morning!" or "Hi, good afternoon!") but don't recite the exact time - just be aware of it for context.\n\n`;
+        processedPrompt = timeInstruction + processedPrompt;
+    }
+    
     // Always add the preprompt with the agent name
     const preprompt = AGENT_PREPROMPT.replace(/{AGENT_NAME}/g, nameToUse);
     processedPrompt = `${preprompt}\n\n${processedPrompt}`;
@@ -238,13 +246,15 @@ async function createUltravoxCall(options = {}) {
         corpusId: overrideCorpusId,
         toolNames,
         agentName,
-        medium
+        medium,
+        userLocalTimeString,
+        userTimeZone
     } = options;
 
     // Create base call config
     const callConfig = {
         systemPrompt: systemPrompt ? 
-            processSystemPrompt(systemPrompt, agentName) : 
+            processSystemPrompt(systemPrompt, agentName, userLocalTimeString, userTimeZone) : 
             getSystemPrompt(isOutbound, agentName),
         model: 'fixie-ai/ultravox-70B',  // Ensure we use 70B model which handles tools better
         voice: voiceId || AI_VOICE,
@@ -844,6 +854,28 @@ app.post('/outgoing', async (req, res) => {
         
         if (!destinationNumber) {
             return res.status(400).json({ error: 'Destination phone number is required' });
+        }
+
+        // Block toll numbers
+        const tollNumberPrefixes = [
+            '+1900', // Premium rate services
+            '+1976', // Premium rate services
+            '+1809', // Dominican Republic (known for toll fraud)
+            '+1284', // British Virgin Islands
+            '+1473', // Grenada
+            '+1649', // Turks and Caicos
+            '+1664', // Montserrat
+            '+1767', // Dominica
+            '+1784', // Saint Vincent and the Grenadines
+            '+1868', // Trinidad and Tobago
+            '+1876', // Jamaica
+        ];
+
+        if (tollNumberPrefixes.some(prefix => destinationNumber.startsWith(prefix))) {
+            return res.status(403).json({ 
+                error: 'Calls to toll numbers are not allowed',
+                message: 'This number appears to be a toll or premium rate number which is not supported.'
+            });
         }
         
         // Check if we have the required credentials based on the active provider
@@ -1478,14 +1510,18 @@ app.post('/webrtc-join-url', async (req, res) => {
             voiceId, 
             corpusId, 
             agentName, 
-            systemPrompt 
+            systemPrompt,
+            userLocalTimeString,
+            userTimeZone
         } = req.body;
         
         console.log('Received WebRTC join URL request:', {
             voiceId,
             corpusId,
             agentName,
-            systemPrompt: systemPrompt ? 'provided' : 'not provided'
+            systemPrompt: systemPrompt ? 'provided' : 'not provided',
+            userLocalTimeString: userLocalTimeString ? 'provided' : 'not provided',
+            userTimeZone: userTimeZone ? 'provided' : 'not provided'
         });
         
         // Create Ultravox call with WebRTC medium
@@ -1494,6 +1530,8 @@ app.post('/webrtc-join-url', async (req, res) => {
             voiceId,
             corpusId,
             agentName,
+            userLocalTimeString,
+            userTimeZone,
             // Specific options for WebRTC
             medium: { "webRtc": {} }
         });
