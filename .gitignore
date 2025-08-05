@@ -22,4 +22,4 @@ Thumbs.db
 .vscode/
 *.sublime-*
 *.swp
-*.swo 
+*.swo .env*
