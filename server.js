@@ -262,7 +262,11 @@ async function createUltravoxCall(options = {}) {
         firstSpeaker: isOutbound ? OUTBOUND_FIRST_SPEAKER : INBOUND_FIRST_SPEAKER,
         medium: medium || { "twilio": {} }, // Use provided medium or default to twilio
         recordingEnabled: true,
-        selectedTools: []
+        selectedTools: [],
+        // Increase context length and token limits
+        maxTokens: parseInt(process.env.ULTRAVOX_MAX_TOKENS) || 8192,  // Default to 8K tokens
+        contextLength: parseInt(process.env.ULTRAVOX_CONTEXT_LENGTH) || 16384,  // Default to 16K context
+        maxResponseTokens: parseInt(process.env.ULTRAVOX_MAX_RESPONSE_TOKENS) || 4096  // Default to 4K response tokens
     };
 
     // Add tools only if explicitly provided or if ULTRAVOX_USE_TOOLS is true and toolNames is undefined

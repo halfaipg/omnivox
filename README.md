@@ -84,6 +84,11 @@ ULTRAVOX_API_KEY=your_api_key
 ULTRAVOX_API_URL=https://api.ultravox.ai
 ULTRAVOX_AGENT_ID=your_agent_id
 
+# Context Length and Token Limits (Optional - defaults shown)
+ULTRAVOX_MAX_TOKENS=8192          # Maximum tokens for the entire conversation
+ULTRAVOX_CONTEXT_LENGTH=16384     # Maximum context length (16K tokens)
+ULTRAVOX_MAX_RESPONSE_TOKENS=4096 # Maximum tokens for AI responses
+
 # If using Twilio
 TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
@@ -190,6 +195,36 @@ Note: To disable the corpus (RAG) functionality:
    - Selecting from dropdown in web interface
    - Setting `ULTRAVOX_CORPUS_ID` in `.env`
    - Including in API calls
+
+## Context Length Configuration
+
+The AI can now handle much longer conversations and more detailed prompts. You can configure the context length and token limits using these environment variables:
+
+### Token Limits
+- **`ULTRAVOX_MAX_TOKENS`** (default: 8192): Maximum tokens for the entire conversation
+- **`ULTRAVOX_CONTEXT_LENGTH`** (default: 16384): Maximum context length (16K tokens)  
+- **`ULTRAVOX_MAX_RESPONSE_TOKENS`** (default: 4096): Maximum tokens for AI responses
+
+### Recommended Settings
+For longer conversations and detailed knowledge bases:
+```bash
+ULTRAVOX_MAX_TOKENS=16384
+ULTRAVOX_CONTEXT_LENGTH=32768
+ULTRAVOX_MAX_RESPONSE_TOKENS=8192
+```
+
+For maximum context (use with caution - may increase costs):
+```bash
+ULTRAVOX_MAX_TOKENS=32768
+ULTRAVOX_CONTEXT_LENGTH=65536
+ULTRAVOX_MAX_RESPONSE_TOKENS=16384
+```
+
+### What This Fixes
+- **Text cutoff issues**: No more 2048 character limits
+- **Longer conversations**: AI can remember more of the conversation history
+- **Detailed knowledge bases**: Larger corpora can be processed without truncation
+- **Complex prompts**: System prompts can be much more detailed
 
 ## Common Issues & Solutions
 
